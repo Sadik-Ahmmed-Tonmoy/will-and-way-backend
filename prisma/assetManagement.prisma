@@ -1,0 +1,99 @@
+// Add these enums to your schema
+enum PropertyType {
+  RESIDENTIAL
+  COMMERCIAL
+  LAND
+  OTHER
+}
+
+enum AssetType {
+  PROPERTY
+  BANK_ACCOUNT
+  INVESTMENT_ACCOUNT
+  RETIREMENT_ACCOUNT
+  INSURANCE_PLAN
+  BUSINESS_INTEREST
+  SAFE_DEPOSIT_BOX
+  CRYPTO
+}
+
+enum LoanType {
+  OUTSTANDING
+  LOAN_GIVEN
+}
+
+// Add these models to your schema
+model Property {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String       @db.ObjectId
+  propertyType   PropertyType
+  country        String?
+  streetAddress  String
+  unitNumber     String?
+  postalCode     String?
+  isJoint        Boolean      @default(false)
+  estimatedValue Float?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("properties")
+}
+
+model Asset {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String    @db.ObjectId
+  assetType         AssetType
+  institutionName   String
+  accountNumber     String?
+  isJoint           Boolean   @default(false)
+  isNominated       Boolean   @default(false)
+  approximateValue  Float?
+  cryptoWalletAddress String?
+  cryptoType        String?
+  description       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([userId, assetType])
+  @@map("assets")
+}
+
+model Loan {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String    @db.ObjectId
+  loanType          LoanType
+  institutionName   String
+  accountNumber     String?
+  approximateBalance Float?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([userId, loanType])
+  @@map("loans")
+}
+
+model Advisor {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @db.ObjectId
+  name            String
+  email           String?
+  phone           String?
+  firm            String?
+  specialization  String?   // e.g., "Lawyer", "Financial Advisor", "Accountant"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("advisors")
+}

@@ -1,0 +1,26 @@
+model Conversation {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  participants  String[]  // array of user IDs
+  lastMessageAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+  
+  @@index([participants])
+  @@map("conversations")
+}
+
+model Message {
+  id             String     @id @default(auto()) @map("_id") @db.ObjectId   // ✅ fixed
+  conversationId String     @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String     @db.ObjectId
+  sender         User       @relation(fields: [senderId], references: [id])
+  content        String
+  imageUrl       String?
+  readAt         DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  @@map("messages")
+}

@@ -1,0 +1,51 @@
+enum GiftType {
+    CASH
+    ITEM
+    COLLECTION
+    VEHICLE
+    PROPERTY
+    FINANCIAL_ACCOUNT
+}
+
+model Gift {
+    id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+    giftType                GiftType
+    amount                  Float?
+    itemName                String?
+    description             String?
+    vehicleDetails          String?
+    propertyAddress         String?
+    financialAccountDetails String?
+    personalMessage         String?
+    
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    userId String @db.ObjectId
+    user   User   @relation(fields: [userId], references: [id])
+
+    recipients GiftRecipient[]
+    willGifts  WillGift[]
+
+    @@index([userId])
+    @@map("gifts")
+}
+
+model GiftRecipient {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    relation   RelationType
+    percentage Float?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    peopleID  String @db.ObjectId
+    recipient People @relation(name: "GiftRecipientPerson", fields: [peopleID], references: [id])
+
+    giftId String @db.ObjectId
+    gift   Gift   @relation(fields: [giftId], references: [id])
+
+    @@index([giftId])
+    @@map("gift_recipients")
+}

@@ -1,0 +1,114 @@
+enum ExecutorType {
+  PRIMARY
+  SECONDARY
+}
+
+enum DistributionType {
+  PERCENTAGE
+  SPECIFIC_GIFT
+  RESIDUARY
+}
+
+enum WillStatus {
+  DRAFT
+  COMPLETED
+  EXECUTED
+  REVOKED
+}
+
+model Will {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String     @db.ObjectId
+  status          WillStatus @default(DRAFT)
+  completedSteps  String[]
+  currentStep     Int        @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user                  User                  @relation(fields: [userId], references: [id])
+  executors             Executor[]
+  estateDistributions   EstateDistribution[]
+  willGifts             WillGift[]
+  petCaretakers         PetCaretaker[]
+  
+  @@unique([userId])
+  @@map("wills")
+}
+
+model Executor {
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  willId          String       @db.ObjectId
+  peopleId        String?       @db.ObjectId
+  executorType    ExecutorType?
+  backupPeopleId  String?      @db.ObjectId
+  order           Int          @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  will         Will    @relation(fields: [willId], references: [id])
+  person       People?  @relation(name: "ExecutorMainPerson", fields: [peopleId], references: [id])
+  backupPerson People? @relation(name: "ExecutorBackupPerson", fields: [backupPeopleId], references: [id])
+
+  @@index([willId])
+  @@map("executors")
+}
+
+model EstateDistribution {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  willId          String           @db.ObjectId
+  peopleId        String?          @db.ObjectId
+  charityName     String?
+  charityUEN      String?
+  percentage      Float
+  distributionType DistributionType
+  order           Int              @default(1)
+  notes           String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  will   Will    @relation(fields: [willId], references: [id])
+  person People? @relation(name: "DistributionPerson", fields: [peopleId], references: [id])
+
+  @@index([willId])
+  @@map("estate_distributions")
+}
+
+model WillGift {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  willId  String @db.ObjectId
+  giftId  String @db.ObjectId
+  order   Int    @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  will  Will  @relation(fields: [willId], references: [id])
+  gift  Gift  @relation(fields: [giftId], references: [id])
+
+  @@index([willId])
+  @@index([giftId])
+  @@map("will_gifts")
+}
+
+model PetCaretaker {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  willId          String   @db.ObjectId
+  petId           String   @db.ObjectId
+  caretakerId     String   @db.ObjectId
+  cashAllocation  Float?
+  notes           String?
+  order           Int      @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  will      Will   @relation(fields: [willId], references: [id])
+  pet       People @relation(name: "CaretakerPet", fields: [petId], references: [id])
+  caretaker People @relation(name: "CaretakerPerson", fields: [caretakerId], references: [id])
+
+  @@index([willId])
+  @@map("pet_caretakers")
+}

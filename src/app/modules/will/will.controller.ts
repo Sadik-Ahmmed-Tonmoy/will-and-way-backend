@@ -1,0 +1,201 @@
+import { Request, Response } from 'express';
+import httpStatus from 'http-status';
+import sendResponse from '../../../shared/sendResponse';
+import { WillServices } from './will.service';
+import catchAsync from '../../utils/catchAsync';
+
+// ========== WILL CONTROLLERS ==========
+const createWill = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.createWill(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Will created successfully',
+    data: result,
+  });
+});
+
+const getMyWill = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.getMyWill(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Will fetched successfully',
+    data: result,
+  });
+});
+
+const getFullWill = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.getFullWill(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Full will fetched successfully',
+    data: result,
+  });
+});
+
+const updateWillStatus = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.updateWillStatus(req.user.id, req.body.status);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Will status updated successfully',
+    data: result,
+  });
+});
+
+const updateWillStep = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.updateWillStep(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Will step updated successfully',
+    data: result,
+  });
+});
+
+// ========== EXECUTOR CONTROLLERS ==========
+const addExecutor = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.addExecutor(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Executor added successfully',
+    data: result,
+  });
+});
+
+const updateExecutor = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.updateExecutor(req.user.id, req.params.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Executor updated successfully',
+    data: result,
+  });
+});
+
+const deleteExecutor = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.deleteExecutor(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Executor deleted successfully',
+    data: result,
+  });
+});
+
+const removePersonFromExecutor = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.removePersonFromExecutor(req.user.id, req.params.peopleId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Person removed from executor successfully',
+    data: result,
+  });
+}
+);
+
+// ========== ESTATE DISTRIBUTION CONTROLLERS ==========
+const addEstateDistribution = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.addEstateDistribution(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Estate distribution added successfully',
+    data: result,
+  });
+});
+
+const updateEstateDistribution = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.updateEstateDistribution(req.user.id, req.params.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Estate distribution updated successfully',
+    data: result,
+  });
+});
+
+const deleteEstateDistribution = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.deleteEstateDistribution(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Estate distribution deleted successfully',
+    data: result,
+  });
+});
+
+// ========== WILL GIFT CONTROLLERS ==========
+const addWillGift = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.addWillGift(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Gift added to will successfully',
+    data: result,
+  });
+});
+
+const deleteWillGift = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.deleteWillGift(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Gift removed from will successfully',
+    data: result,
+  });
+});
+
+// ========== PET CARETAKER CONTROLLERS ==========
+const addPetCaretaker = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.addPetCaretaker(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Pet caretaker added successfully',
+    data: result,
+  });
+});
+
+const updatePetCaretaker = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.updatePetCaretaker(req.user.id, req.params.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Pet caretaker updated successfully',
+    data: result,
+  });
+});
+
+const deletePetCaretaker = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.deletePetCaretaker(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Pet caretaker deleted successfully',
+    data: result,
+  });
+});
+
+export const WillController = {
+  createWill,
+  getMyWill,
+  getFullWill,
+  updateWillStatus,
+  updateWillStep,
+  addExecutor,
+  updateExecutor,
+  deleteExecutor,
+    removePersonFromExecutor,
+  addEstateDistribution,
+  updateEstateDistribution,
+  deleteEstateDistribution,
+  addWillGift,
+  deleteWillGift,
+  addPetCaretaker,
+  updatePetCaretaker,
+  deletePetCaretaker,
+};
