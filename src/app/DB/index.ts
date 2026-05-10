@@ -5,7 +5,8 @@ import { MongoClient } from 'mongodb';
 
 export const initiateSuperAdmin = async () => {
   // TTL index created on expiresAt field in OTP collection'
-  const mongo = new MongoClient(process.env.DATABASE_URL!);
+  // const mongo = new MongoClient(process.env.DATABASE_URL!);
+  const mongo = new MongoClient(process.env.DATABASE_URL!, { family: 4 });
   await mongo.connect();
 
   const db = mongo.db(); // get default DB from URL

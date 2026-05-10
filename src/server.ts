@@ -7,6 +7,9 @@ import { redis } from './lib/redis';
 import { setupSocket } from './socket';
 import { messageWorker } from './workers/messagePersistence.worker';
 import {  seedDemoUser } from './app/DB/seedCategories';
+import dns from 'dns';
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+dns.setDefaultResultOrder('ipv4first');
 
 const port = config.port || 5000;
 
