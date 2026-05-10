@@ -13,7 +13,7 @@ import { successTemplate } from './lib/stripe/successTemplete';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
-
+ 
 import { bookingExpirationQueue } from './queues/bookingExpiration.queue';
 import { captainHireExpirationQueue } from './queues/captainHireExpiration.queue';
 import { messagePersistenceQueue } from './queues/messagePersistence.queue';
