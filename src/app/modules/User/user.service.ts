@@ -1,4 +1,4 @@
-import { People, RelationType } from '@prisma/client';
+import { People, RelationType, WillStatus } from '@prisma/client';
 import httpStatus from 'http-status';
 import ApiError from '../../../errors/ApiErrors';
 import prisma from '../../../shared/prisma';
@@ -163,6 +163,20 @@ const addPerson = async (userId: string, payload: IAddPerson) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
   }
 
+    const existingWill = await prisma.will.findUnique({ where: { userId } });
+
+    if (!existingWill) {
+      await prisma.will.create({
+        data: {
+          userId,
+          status: WillStatus.DRAFT,
+          step: 1,
+        },
+      });
+    }
+
+
+  
   // Prepare data object with required fields
   const data: any = {
     userId,

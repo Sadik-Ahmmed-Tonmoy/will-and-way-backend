@@ -97,23 +97,73 @@ const removePersonFromExecutor = catchAsync(async (req: Request, res: Response) 
 }
 );
 
-// ========== ESTATE DISTRIBUTION CONTROLLERS ==========
-const addEstateDistribution = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.addEstateDistribution(req.user.id, req.body);
+
+// ========== DISTRIBUTION CONTROLLERS ==========
+
+// Add multiple distributions with auto-calculated percentages
+const addDistributions = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.addDistributions(req.user.id, req.body.distributions);
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: 'Estate distribution added successfully',
+    message: 'Distributions added successfully',
     data: result,
   });
 });
 
-const updateEstateDistribution = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.updateEstateDistribution(req.user.id, req.params.id, req.body);
+// Bulk update distributions (add/update/remove)
+const bulkUpdateDistributions = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.bulkUpdateDistributions(req.user.id, req.body.distributions);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Estate distribution updated successfully',
+    message: 'Distributions updated successfully',
+    data: result,
+  });
+});
+
+const getAllDistributions = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.getAllDistributions(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Distributions fetched successfully',
+    data: result,
+  });
+});
+
+// Add backup distributor to a distribution
+const addBackupDistributor = catchAsync(async (req: Request, res: Response) => {
+  const { distributionId } = req.params;
+  const result = await WillServices.addBackupDistributor(req.user.id, distributionId, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Backup distributor added successfully',
+    data: result,
+  });
+});
+
+// Update backup distributor
+const updateBackupDistributor = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await WillServices.updateBackupDistributor(req.user.id, id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Backup distributor updated successfully',
+    data: result,
+  });
+});
+
+// Delete backup distributor
+const deleteBackupDistributor = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await WillServices.deleteBackupDistributor(req.user.id, id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Backup distributor deleted successfully',
     data: result,
   });
 });
@@ -123,10 +173,13 @@ const deleteEstateDistribution = catchAsync(async (req: Request, res: Response) 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Estate distribution deleted successfully',
+    message: 'Distribution deleted successfully',
     data: result,
   });
 });
+
+
+
 
 // ========== WILL GIFT CONTROLLERS ==========
 const addWillGift = catchAsync(async (req: Request, res: Response) => {
@@ -189,13 +242,18 @@ export const WillController = {
   addExecutor,
   updateExecutor,
   deleteExecutor,
-    removePersonFromExecutor,
-  addEstateDistribution,
-  updateEstateDistribution,
-  deleteEstateDistribution,
+  removePersonFromExecutor,
   addWillGift,
   deleteWillGift,
   addPetCaretaker,
   updatePetCaretaker,
   deletePetCaretaker,
+  getAllDistributions,
+  addDistributions,
+  bulkUpdateDistributions,
+  addBackupDistributor,
+  
+  updateBackupDistributor,
+  deleteBackupDistributor,
+  deleteEstateDistribution,
 };

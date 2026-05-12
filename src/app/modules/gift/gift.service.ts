@@ -3,14 +3,15 @@ import httpStatus from 'http-status';
 import ApiError from '../../../errors/ApiErrors';
 import prisma from '../../../shared/prisma';
 import { ICreateGift, IRecipient, IUpdateGift } from './gift.interface';
+import { calculateAutoPercentages } from '../../utils/calculateAutoPercentages';
 
 // CREATE GIFT
 const createGift = async (userId: string, payload: ICreateGift) => {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-  }
-
+  // const user = await prisma.user.findUnique({ where: { id: userId } });
+  // if (!user) {
+  //   throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  // }
+let persons = [];
   // Validate all recipients exist and belong to user
   for (const recipient of payload.recipients) {
     const person = await prisma.people.findFirst({
@@ -18,6 +19,10 @@ const createGift = async (userId: string, payload: ICreateGift) => {
         id: recipient.peopleId,
         userId,
       },
+      select:{
+        id: true,
+        relationType: true,
+      }
     });
 
     if (!person) {
@@ -26,8 +31,10 @@ const createGift = async (userId: string, payload: ICreateGift) => {
         `Person with ID ${recipient.peopleId} not found`
       );
     }
+    persons.push(person);
   }
 
+  console.log("ssssssssssssssssssssssssssssssssssss", persons);
   // Create gift with recipients in transaction
   const result = await prisma.$transaction(async (tx) => {
     // Create the gift
@@ -43,10 +50,10 @@ const createGift = async (userId: string, payload: ICreateGift) => {
         financialAccountDetails: payload.financialAccountDetails,
         personalMessage: payload.personalMessage,
         recipients: {
-          create: payload.recipients.map((recipient: IRecipient) => ({
-            peopleID: recipient.peopleId,
-            relation: recipient.relation,
-            percentage: recipient.percentage,
+          create: persons?.map((recipient: any) => ({
+            peopleID: recipient.id,
+            relation: recipient.relationType,
+            percentage: calculateAutoPercentages(payload.recipients.length),
           })),
         },
       },
@@ -59,6 +66,7 @@ const createGift = async (userId: string, payload: ICreateGift) => {
                 fullName: true,
                 email: true,
                 relationType: true,
+                relationWithUser: true,
               },
             },
           },
@@ -68,8 +76,33 @@ const createGift = async (userId: string, payload: ICreateGift) => {
 
     return gift;
   });
+   
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
 
-  return result;
+    const existing = await prisma.willGift.findFirst({ where: { willId: will.id, giftId: result.id } });
+  if (existing) throw new ApiError(httpStatus.BAD_REQUEST, 'Gift already added to will');
+
+  const willGift = await prisma.willGift.create({
+    data: {
+      willId: will.id,
+      giftId: result.id,
+    },
+    include: {
+      gift: {
+        include: {
+          recipients: {
+            include: {
+              recipient: { select: { id: true, fullName: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+
+  return willGift;
 };
 
 // GET ALL GIFTS FOR USER

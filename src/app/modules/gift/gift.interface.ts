@@ -14,7 +14,7 @@ export interface ICreateGift {
 
 export interface IRecipient {
   peopleId: string;
-  relation: RelationType;
+  relation?: RelationType;
   percentage?: number;
 }
 

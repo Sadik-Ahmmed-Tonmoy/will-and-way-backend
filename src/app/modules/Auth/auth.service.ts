@@ -1,4 +1,4 @@
-import { LogInProcess, OTPPurpose, UserRole, UserStatus, VendorStatus } from '@prisma/client';
+import { LogInProcess, OTPPurpose, UserRole, UserStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import httpStatus from 'http-status';
 import { Secret } from 'jsonwebtoken';
@@ -144,19 +144,7 @@ const signup = async (payload: any) => {
   });
 
   let vendorDetails = null;
-  if (role === UserRole.VENDOR) {
-    vendorDetails = await prisma.vendorProfile.create({
-      data: {
-        userId: user.id,
-        uen: payload.uen!,
-        country: payload.country!,
-        address: payload.address!,
-        postalCode: payload.postalCode!,
-        website: payload.website,
-        status: VendorStatus.PENDING_APPROVAL,
-      },
-    });
-  }
+
 
   const accessToken = jwtHelpers.generateToken(
     { id: user.id, email: user.email, role: user.role },

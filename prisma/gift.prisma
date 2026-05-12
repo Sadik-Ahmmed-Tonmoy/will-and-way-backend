@@ -34,7 +34,7 @@ model Gift {
 model GiftRecipient {
     id String @id @default(auto()) @map("_id") @db.ObjectId
 
-    relation   RelationType
+    relation   RelationType?
     percentage Float?
 
     createdAt DateTime @default(now())

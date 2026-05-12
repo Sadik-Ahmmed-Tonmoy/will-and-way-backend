@@ -3,7 +3,7 @@ import { GiftType, RelationType } from "@prisma/client";
 
 const recipientSchema = z.object({
   peopleId: z.string().min(1, "People ID is required"),
-  relation: z.nativeEnum(RelationType),
+  relation: z.nativeEnum(RelationType).optional(),
   percentage: z.number().min(0).max(100).optional(),
 });
 

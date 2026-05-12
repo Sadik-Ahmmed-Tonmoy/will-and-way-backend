@@ -77,6 +77,89 @@ const updatePetCaretakerValidationSchema = z.object({
   }),
 });
 
+
+
+// ========== DISTRIBUTION VALIDATION ==========
+
+const backupDistributorSchema = z.object({
+  peopleId: z.string().optional(),
+  charityName: z.string().optional(),
+  charityUEN: z.string().optional(),
+}).refine(data => data.peopleId || data.charityName, {
+  message: "Either person or charity must be specified for backup distributor",
+});
+
+const distributionItemSchema = z.object({
+  peopleId: z.string().optional(),
+  charityName: z.string().optional(),
+  charityUEN: z.string().optional(),
+  distributionType: z.nativeEnum(DistributionType).optional(),
+  notes: z.string().optional(),
+  backupDistributors: z.array(backupDistributorSchema).optional(),
+}).refine(data => data.peopleId || data.charityName, {
+  message: "Either person or charity must be specified for distribution",
+});
+
+const addDistributionsValidationSchema = z.object({
+  body: z.object({
+    distributions: z.array(distributionItemSchema).min(1, "At least one distribution is required"),
+  }),
+});
+
+const updateDistributionValidationSchema = z.object({
+  body: z.object({
+    peopleId: z.string().optional(),
+    charityName: z.string().optional(),
+    charityUEN: z.string().optional(),
+    percentage: z.number().min(0).max(100).optional(),
+    distributionType: z.nativeEnum(DistributionType).optional(),
+    notes: z.string().optional(),
+  }),
+});
+
+const addBackupDistributorValidationSchema = z.object({
+  body: z.object({
+    peopleId: z.string().optional(),
+    charityName: z.string().optional(),
+    charityUEN: z.string().optional(),
+  }).refine(data => data.peopleId || data.charityName, {
+    message: "Either person or charity must be specified",
+  }),
+});
+
+const updateBackupDistributorValidationSchema = z.object({
+  body: z.object({
+    peopleId: z.string().optional(),
+    charityName: z.string().optional(),
+    charityUEN: z.string().optional(),
+  }),
+});
+
+const bulkDistributionSchema = z.object({
+  id: z.string().optional(),
+  peopleId: z.string().optional(),
+  charityName: z.string().optional(),
+  charityUEN: z.string().optional(),
+  distributionType: z.nativeEnum(DistributionType).optional(),
+  notes: z.string().optional(),
+  backupDistributors: z.array(z.object({
+    id: z.string().optional(),
+    peopleId: z.string().optional(),
+    charityName: z.string().optional(),
+    charityUEN: z.string().optional(),
+  })).optional(),
+});
+
+const bulkUpdateDistributionsValidationSchema = z.object({
+  body: z.object({
+    distributions: z.array(bulkDistributionSchema).min(1, "At least one distribution is required"),
+  }),
+});
+
+
+
+
+
 export const willValidation = {
   updateWillStatusValidationSchema,
   updateWillStepValidationSchema,
@@ -87,4 +170,10 @@ export const willValidation = {
   addWillGiftValidationSchema,
   addPetCaretakerValidationSchema,
   updatePetCaretakerValidationSchema,
+  addDistributionsValidationSchema,
+  updateDistributionValidationSchema,
+  addBackupDistributorValidationSchema,
+  updateBackupDistributorValidationSchema,
+  bulkUpdateDistributionsValidationSchema,
+  
 };

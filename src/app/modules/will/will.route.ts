@@ -54,19 +54,8 @@ router.delete(
 
 
 // ========== ESTATE DISTRIBUTIONS ==========
-router.post(
-  "/distributions",
-  auth(),
-  validateRequest(willValidation.addEstateDistributionValidationSchema),
-  WillController.addEstateDistribution
-);
 
-router.put(
-  "/distributions/:id",
-  auth(),
-  validateRequest(willValidation.updateEstateDistributionValidationSchema),
-  WillController.updateEstateDistribution
-);
+
 
 router.delete("/distributions/:id", auth(), WillController.deleteEstateDistribution);
 
@@ -96,5 +85,69 @@ router.put(
 );
 
 router.delete("/pet-caretakers/:id", auth(), WillController.deletePetCaretaker);
+
+
+
+
+// ========== DISTRIBUTIONS (Updated) ==========
+
+router.get("/distributions", auth(), WillController.getAllDistributions);
+
+// Add multiple distributions (auto-calculate percentages)
+router.post(
+  "/distributions/bulk",
+  auth(),
+  validateRequest(willValidation.addDistributionsValidationSchema),
+  WillController.addDistributions
+);
+
+// Bulk update distributions (add/update/remove in one call)
+router.put(
+  "/distributions/bulk",
+  auth(),
+  validateRequest(willValidation.bulkUpdateDistributionsValidationSchema),
+  WillController.bulkUpdateDistributions
+);
+
+// Add single distribution (auto-calculate percentage)
+router.post(
+  "/distributions",
+  auth(),
+  validateRequest(willValidation.addDistributionsValidationSchema),
+  WillController.addDistributions
+);
+
+
+// Delete distribution
+router.delete(
+  "/distributions/:id",
+  auth(),
+  WillController.deleteEstateDistribution
+);
+
+// ========== BACKUP DISTRIBUTORS ==========
+
+// Add backup distributor to a distribution
+router.post(
+  "/distributions/:distributionId/backup",
+  auth(),
+  validateRequest(willValidation.addBackupDistributorValidationSchema),
+  WillController.addBackupDistributor
+);
+
+// Update backup distributor
+router.put(
+  "/distributions/backup/:id",
+  auth(),
+  validateRequest(willValidation.updateBackupDistributorValidationSchema),
+  WillController.updateBackupDistributor
+);
+
+// Delete backup distributor
+router.delete(
+  "/distributions/backup/:id",
+  auth(),
+  WillController.deleteBackupDistributor
+);
 
 export const WillRoutes = router;

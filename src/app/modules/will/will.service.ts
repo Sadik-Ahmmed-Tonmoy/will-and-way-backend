@@ -6,12 +6,12 @@ import {
   IUpdateWillStep,
   IAddExecutor,
   IUpdateExecutor,
-  IAddEstateDistribution,
-  IUpdateEstateDistribution,
+
   IAddWillGift,
   IAddPetCaretaker,
   IUpdatePetCaretaker,
 } from './will.interface';
+import { calculateAutoPercentages } from '../../utils/calculateAutoPercentages';
 
 // ========== WILL SERVICES ==========
 
@@ -57,7 +57,17 @@ const getMyWill = async (userId: string) => {
       },
       willGifts: {
         include: {
-          gift: true,
+          gift: {
+            include: {
+              recipients: {
+                include: {
+                  recipient: {
+                    select: { id: true, fullName: true },
+                  },
+                },
+              },
+            }
+          }
         },
       },
       petCaretakers: {
@@ -176,7 +186,7 @@ const addExecutor = async (userId: string, payload: IAddExecutor) => {
     data: {
       willId: will.id,
       peopleId: payload.peopleId,
-    //   executorType: payload.executorType,
+      //   executorType: payload.executorType,
       backupPeopleId: payload.backupPeopleId,
     },
     include: {
@@ -192,17 +202,17 @@ const updateExecutor = async (userId: string, executorId: string, payload: IUpda
 
   const executor = await prisma.executor.findFirst({ where: { id: executorId, willId: will.id } });
   if (!executor) throw new ApiError(httpStatus.NOT_FOUND, 'Executor not found');
-  
+
   console.log(executorId);
   if (payload.peopleId) {
     const person = await prisma.people.findFirst({ where: { id: payload.peopleId, userId } });
     if (!person) throw new ApiError(httpStatus.NOT_FOUND, 'Person not found');
   }
 
-//   if (payload.backupPeopleId) {
-//     const backupPerson = await prisma.people.findFirst({ where: { id: payload.backupPeopleId, userId } });
-//     if (!backupPerson) throw new ApiError(httpStatus.NOT_FOUND, 'Backup person not found');
-//   }
+  //   if (payload.backupPeopleId) {
+  //     const backupPerson = await prisma.people.findFirst({ where: { id: payload.backupPeopleId, userId } });
+  //     if (!backupPerson) throw new ApiError(httpStatus.NOT_FOUND, 'Backup person not found');
+  //   }
 
   return prisma.executor.update({
     where: { id: executorId },
@@ -231,7 +241,7 @@ const deleteExecutor = async (userId: string, executorId: string) => {
 // Remove person from executor (change the person, keep executor)
 const removePersonFromExecutor = async (userId: string, peopleId: string) => {
   console.log('Removing person from executor:', { userId, peopleId });
-  
+
   const will = await prisma.will.findUnique({ where: { userId } });
   if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
 
@@ -273,42 +283,151 @@ const removePersonFromExecutor = async (userId: string, peopleId: string) => {
 
 // ========== ESTATE DISTRIBUTION SERVICES ==========
 
-const addEstateDistribution = async (userId: string, payload: IAddEstateDistribution) => {
+// ========== DISTRIBUTION SERVICES ==========
+
+// Calculate auto percentages based on number of recipients
+// const calculateAutoPercentages = (count: number): number => {
+//   if (count === 0) return 0;
+//   return parseFloat((100 / count).toFixed(2));
+// };
+
+const getAllDistributions = async (userId: string) => {
   const will = await prisma.will.findUnique({ where: { userId } });
   if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
 
-  const currentDistributions = await prisma.estateDistribution.findMany({ where: { willId: will.id } });
-  const currentTotal = currentDistributions.reduce((sum, d) => sum + d.percentage, 0);
-  if (currentTotal + payload.percentage > 100) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Total distribution percentage cannot exceed 100%');
-  }
-
-  if (payload.peopleId) {
-    const person = await prisma.people.findFirst({ where: { id: payload.peopleId, userId } });
-    if (!person) throw new ApiError(httpStatus.NOT_FOUND, 'Person not found');
-  }
-
-  return prisma.estateDistribution.create({
-    data: {
-      willId: will.id,
-      peopleId: payload.peopleId,
-      charityName: payload.charityName,
-      charityUEN: payload.charityUEN,
-      percentage: payload.percentage,
-      distributionType: payload.distributionType,
-      notes: payload.notes,
-    },
+  return prisma.estateDistribution.findMany({
+    where: { willId: will.id },
     include: {
       person: { select: { id: true, fullName: true, email: true } },
+      backupDistributors: {
+        include: {
+          person: { select: { id: true, fullName: true, email: true } },
+        },
+      },
     },
   });
 };
 
-const updateEstateDistribution = async (userId: string, distributionId: string, payload: IUpdateEstateDistribution) => {
+// Add multiple distributions with auto-calculated percentages
+const addDistributions = async (userId: string, distributions: any[]) => {
   const will = await prisma.will.findUnique({ where: { userId } });
   if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
 
-  const distribution = await prisma.estateDistribution.findFirst({ where: { id: distributionId, willId: will.id } });
+  // Delete existing distributions first (replace all)
+  await prisma.estateDistribution.deleteMany({ where: { willId: will.id } });
+
+  // Auto-calculate percentage
+  const percentage = calculateAutoPercentages(distributions.length);
+
+  // Validate all people first
+  for (const dist of distributions) {
+    if (dist.peopleId) {
+      const person = await prisma.people.findFirst({ where: { id: dist.peopleId, userId } });
+      if (!person) throw new ApiError(httpStatus.NOT_FOUND, `Person with ID ${dist.peopleId} not found`);
+    }
+  }
+
+  // Create all distributions
+  const createdDistributions = await prisma.$transaction(
+    distributions.map((dist, index) =>
+      prisma.estateDistribution.create({
+        data: {
+          willId: will.id,
+          peopleId: dist.peopleId || null,
+          charityName: dist.charityName || null,
+          charityUEN: dist.charityUEN || null,
+          percentage: percentage,
+          distributionType: dist.distributionType || 'PERCENTAGE',
+          order: index + 1,
+          notes: dist.notes,
+          backupDistributors: dist.backupDistributors?.length > 0 ? {
+            create: dist.backupDistributors.map((backup: any) => ({
+              peopleId: backup.peopleId || null,
+              charityName: backup.charityName || null,
+              charityUEN: backup.charityUEN || null,
+            })),
+          } : undefined,
+        },
+        include: {
+          person: { select: { id: true, fullName: true, email: true } },
+          backupDistributors: {
+            include: {
+              person: { select: { id: true, fullName: true, email: true } },
+            },
+          },
+        },
+      })
+    )
+  );
+
+  return {
+    distributions: createdDistributions,
+    totalCount: createdDistributions.length,
+    autoPercentage: percentage,
+    totalPercentage: percentage * createdDistributions.length,
+  };
+};
+
+// Bulk update distributions (replace all)
+const bulkUpdateDistributions = async (userId: string, distributions: any[]) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+
+  // Delete all existing distributions
+  await prisma.estateDistribution.deleteMany({ where: { willId: will.id } });
+
+  // Auto-calculate percentage
+  const percentage = calculateAutoPercentages(distributions.length);
+
+  // Create new distributions
+  const createdDistributions = await prisma.$transaction(
+    distributions.map((dist, index) =>
+      prisma.estateDistribution.create({
+        data: {
+          willId: will.id,
+          peopleId: dist.peopleId || null,
+          charityName: dist.charityName || null,
+          charityUEN: dist.charityUEN || null,
+          percentage: dist.percentage || percentage,
+          distributionType: dist.distributionType || 'PERCENTAGE',
+          order: index + 1,
+          notes: dist.notes,
+          backupDistributors: dist.backupDistributors?.length > 0 ? {
+            create: dist.backupDistributors.map((backup: any) => ({
+              peopleId: backup.peopleId || null,
+              charityName: backup.charityName || null,
+              charityUEN: backup.charityUEN || null,
+            })),
+          } : undefined,
+        },
+        include: {
+          person: { select: { id: true, fullName: true, email: true } },
+          backupDistributors: {
+            include: {
+              person: { select: { id: true, fullName: true, email: true } },
+            },
+          },
+        },
+      })
+    )
+  );
+
+  return {
+    distributions: createdDistributions,
+    totalCount: createdDistributions.length,
+    autoPercentage: percentage,
+  };
+};
+
+// Add backup distributor
+const addBackupDistributor = async (userId: string, distributionId: string, payload: any) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+
+  const distribution = await prisma.estateDistribution.findFirst({
+    where: { id: distributionId, willId: will.id },
+  });
+
   if (!distribution) throw new ApiError(httpStatus.NOT_FOUND, 'Distribution not found');
 
   if (payload.peopleId) {
@@ -316,14 +435,68 @@ const updateEstateDistribution = async (userId: string, distributionId: string, 
     if (!person) throw new ApiError(httpStatus.NOT_FOUND, 'Person not found');
   }
 
-  return prisma.estateDistribution.update({
-    where: { id: distributionId },
+  const backup = await prisma.backupDistributor.create({
+    data: {
+      distributionId,
+      peopleId: payload.peopleId || null,
+      charityName: payload.charityName || null,
+      charityUEN: payload.charityUEN || null,
+    },
+    include: {
+      person: { select: { id: true, fullName: true, email: true } },
+    },
+  });
+
+  return backup;
+};
+
+// Update backup distributor
+const updateBackupDistributor = async (userId: string, backupId: string, payload: any) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+
+  const backup = await prisma.backupDistributor.findFirst({
+    where: { id: backupId },
+    include: { distribution: true },
+  });
+
+  if (!backup || backup.distribution.willId !== will.id) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Backup distributor not found');
+  }
+
+  if (payload.peopleId) {
+    const person = await prisma.people.findFirst({ where: { id: payload.peopleId, userId } });
+    if (!person) throw new ApiError(httpStatus.NOT_FOUND, 'Person not found');
+  }
+
+  return prisma.backupDistributor.update({
+    where: { id: backupId },
     data: payload,
     include: {
       person: { select: { id: true, fullName: true, email: true } },
     },
   });
 };
+
+// Delete backup distributor
+const deleteBackupDistributor = async (userId: string, backupId: string) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+
+  const backup = await prisma.backupDistributor.findFirst({
+    where: { id: backupId },
+    include: { distribution: true },
+  });
+
+  if (!backup || backup.distribution.willId !== will.id) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Backup distributor not found');
+  }
+
+  await prisma.backupDistributor.delete({ where: { id: backupId } });
+  return { id: backupId, deleted: true };
+};
+
+
 
 const deleteEstateDistribution = async (userId: string, distributionId: string) => {
   const will = await prisma.will.findUnique({ where: { userId } });
@@ -335,6 +508,9 @@ const deleteEstateDistribution = async (userId: string, distributionId: string) 
   await prisma.estateDistribution.delete({ where: { id: distributionId } });
   return { id: distributionId, deleted: true };
 };
+
+
+
 
 // ========== WILL GIFT SERVICES ==========
 
@@ -447,13 +623,18 @@ export const WillServices = {
   addExecutor,
   updateExecutor,
   deleteExecutor,
-    removePersonFromExecutor,
-  addEstateDistribution,
-  updateEstateDistribution,
+  removePersonFromExecutor,
   deleteEstateDistribution,
   addWillGift,
   deleteWillGift,
   addPetCaretaker,
   updatePetCaretaker,
   deletePetCaretaker,
+  getAllDistributions,
+  updateBackupDistributor,
+  deleteBackupDistributor,
+  addDistributions,
+  bulkUpdateDistributions,
+  addBackupDistributor,
+
 };

@@ -7,8 +7,8 @@ enum DistributionType {
   PERCENTAGE
   SPECIFIC_GIFT
   RESIDUARY
+  CHARITY
 }
-
 enum WillStatus {
   DRAFT
   COMPLETED
@@ -55,6 +55,28 @@ model Executor {
   @@map("executors")
 }
 
+// model EstateDistribution {
+//   id              String           @id @default(auto()) @map("_id") @db.ObjectId
+//   willId          String           @db.ObjectId
+//   peopleId        String?          @db.ObjectId
+//   charityName     String?
+//   charityUEN      String?
+//   percentage      Float
+//   distributionType DistributionType
+//   order           Int              @default(1)
+//   notes           String?
+  
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+
+//   will   Will    @relation(fields: [willId], references: [id])
+//   person People? @relation(name: "DistributionPerson", fields: [peopleId], references: [id])
+
+//   @@index([willId])
+//   @@map("estate_distributions")
+// }
+
+
 model EstateDistribution {
   id              String           @id @default(auto()) @map("_id") @db.ObjectId
   willId          String           @db.ObjectId
@@ -69,11 +91,30 @@ model EstateDistribution {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  will   Will    @relation(fields: [willId], references: [id])
-  person People? @relation(name: "DistributionPerson", fields: [peopleId], references: [id])
-
+  will            Will                      @relation(fields: [willId], references: [id])
+  person          People?                   @relation(name: "DistributionPerson", fields: [peopleId], references: [id])
+  backupDistributors BackupDistributor[]
+  
   @@index([willId])
   @@map("estate_distributions")
+}
+
+model BackupDistributor {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  distributionId        String   @db.ObjectId
+  peopleId              String?  @db.ObjectId
+  charityName           String?
+  charityUEN            String?
+  order                 Int      @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  distribution          EstateDistribution @relation(fields: [distributionId], references: [id])
+  person                People?            @relation(name: "BackupDistributorPerson", fields: [peopleId], references: [id])
+
+  @@index([distributionId])
+  @@map("backup_distributors")
 }
 
 model WillGift {
