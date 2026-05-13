@@ -62,17 +62,16 @@ const addWillGiftValidationSchema = z.object({
 
 const addPetCaretakerValidationSchema = z.object({
   body: z.object({
-    petId: z.string().min(1, "Pet ID is required"),
     caretakerId: z.string().min(1, "Caretaker ID is required"),
-    cashAllocation: z.number().positive().optional(),
+    cashAllocation: z.number().positive("Cash allocation must be positive").optional(),
     notes: z.string().optional(),
   }),
 });
 
 const updatePetCaretakerValidationSchema = z.object({
   body: z.object({
-    caretakerId: z.string().optional(),
-    cashAllocation: z.number().positive().optional(),
+    caretakerId: z.string().min(1, "Caretaker ID is required").optional(),
+    cashAllocation: z.number().positive("Cash allocation must be positive").optional(),
     notes: z.string().optional(),
   }),
 });

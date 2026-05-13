@@ -1,4 +1,64 @@
-// Add these enums to your schema
+
+
+// ========== ASSET TYPES ==========
+enum AssetType {
+  BANK_ACCOUNT
+  INVESTMENT_ACCOUNT
+  BUSINESS_INTEREST
+  RETIREMENT_ACCOUNT
+  INSURANCE_PLAN
+  SAFE_DEPOSIT_BOX
+  CRYPTO
+}
+
+enum LoanType {
+  OUTSTANDING // user owes someone
+  GIVEN // someone owes user
+}
+
+enum CoverType {
+  TERM_LIFE
+  WHOLE_LIFE
+  ENDOWMENT
+  UNIVERSAL_LIFE
+  INVESTMENT
+  OTHER
+}
+
+model Asset {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String    @db.ObjectId
+  type             AssetType // e.g. for bank account: "Savings", "Checking"; for business: "LLC", "Partnership"
+  // Common fields
+  isJointlyOwned   Boolean   @default(false)
+  isNominated      Boolean   @default(false)
+  approximateValue Float? // in dollars (can be null for some types)
+  description      String? // used for SafeDepositBox, Crypto
+
+  // Bank & Investment & Retirement
+  institutionName String?
+  accountNumber   String?
+
+  // Business
+  companyName String?
+
+  // Insurance
+  policyNumber String?
+  coverType    CoverType?
+  maturityDate DateTime?
+  faceValue    Float?
+
+  // Crypto / Safe box description already used
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("assets")
+}
+
 enum PropertyType {
   RESIDENTIAL
   COMMERCIAL
@@ -6,35 +66,19 @@ enum PropertyType {
   OTHER
 }
 
-enum AssetType {
-  PROPERTY
-  BANK_ACCOUNT
-  INVESTMENT_ACCOUNT
-  RETIREMENT_ACCOUNT
-  INSURANCE_PLAN
-  BUSINESS_INTEREST
-  SAFE_DEPOSIT_BOX
-  CRYPTO
-}
-
-enum LoanType {
-  OUTSTANDING
-  LOAN_GIVEN
-}
-
-// Add these models to your schema
 model Property {
-  id             String       @id @default(auto()) @map("_id") @db.ObjectId
-  userId         String       @db.ObjectId
-  propertyType   PropertyType
-  country        String?
-  streetAddress  String
-  unitNumber     String?
-  postalCode     String?
-  isJoint        Boolean      @default(false)
-  estimatedValue Float?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String       @db.ObjectId
+  type            PropertyType
+  country         String
+  streetAddress   String
+  unitNumber      String?
+  postcode        String?
+  isJointProperty Boolean      @default(false)
+  estimatedValue  Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 
@@ -42,55 +86,33 @@ model Property {
   @@map("properties")
 }
 
-model Asset {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String    @db.ObjectId
-  assetType         AssetType
-  institutionName   String
-  accountNumber     String?
-  isJoint           Boolean   @default(false)
-  isNominated       Boolean   @default(false)
-  approximateValue  Float?
-  cryptoWalletAddress String?
-  cryptoType        String?
-  description       String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([userId, assetType])
-  @@map("assets")
-}
-
 model Loan {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String    @db.ObjectId
-  loanType          LoanType
-  institutionName   String
-  accountNumber     String?
-  approximateBalance Float?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String   @db.ObjectId
+  type               LoanType // OUTSTANDING (I owe) or GIVEN (someone owes me)
+  institutionName   String // name of person/business
+  accountNumber     String // account number
+  approximateBalance Float
+  
+
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
-  @@index([userId, loanType])
   @@map("loans")
 }
 
 model Advisor {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String   @db.ObjectId
-  name            String
-  email           String?
-  phone           String?
-  firm            String?
-  specialization  String?   // e.g., "Lawyer", "Financial Advisor", "Accountant"
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  name      String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 

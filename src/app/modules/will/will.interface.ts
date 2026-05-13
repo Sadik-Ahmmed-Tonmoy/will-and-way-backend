@@ -42,8 +42,9 @@ export interface IAddWillGift {
   giftId: string;
 }
 
+// ========== PET CARETAKER INTERFACES (UPDATED) ==========
+
 export interface IAddPetCaretaker {
-  petId: string;
   caretakerId: string;
   cashAllocation?: number;
   notes?: string;
@@ -110,4 +111,9 @@ export interface IBulkUpdateDistributions {
       charityUEN?: string;
     }[];
   }[];
+}
+
+export interface ILinkAssetToWill {
+  assetType: 'PROPERTY' | 'ASSET' | 'LOAN' | 'ADVISOR';
+  assetId: string;
 }

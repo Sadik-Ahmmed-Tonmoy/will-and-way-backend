@@ -34,7 +34,6 @@ let persons = [];
     persons.push(person);
   }
 
-  console.log("ssssssssssssssssssssssssssssssssssss", persons);
   // Create gift with recipients in transaction
   const result = await prisma.$transaction(async (tx) => {
     // Create the gift

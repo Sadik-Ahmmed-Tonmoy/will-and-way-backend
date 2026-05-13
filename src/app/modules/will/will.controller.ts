@@ -203,6 +203,8 @@ const deleteWillGift = catchAsync(async (req: Request, res: Response) => {
 });
 
 // ========== PET CARETAKER CONTROLLERS ==========
+// ========== PET CARETAKER CONTROLLERS ==========
+
 const addPetCaretaker = catchAsync(async (req: Request, res: Response) => {
   const result = await WillServices.addPetCaretaker(req.user.id, req.body);
   sendResponse(res, {
@@ -214,7 +216,7 @@ const addPetCaretaker = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updatePetCaretaker = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.updatePetCaretaker(req.user.id, req.params.id, req.body);
+  const result = await WillServices.updatePetCaretaker(req.user.id, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -224,14 +226,35 @@ const updatePetCaretaker = catchAsync(async (req: Request, res: Response) => {
 });
 
 const deletePetCaretaker = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.deletePetCaretaker(req.user.id, req.params.id);
+  const result = await WillServices.deletePetCaretaker(req.user.id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Pet caretaker deleted successfully',
+    message: 'Pet caretakers deleted successfully',
     data: result,
   });
 });
+
+const getPetCaretakers = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.getPetCaretakers(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Pet caretakers fetched successfully',
+    data: result,
+  });
+});
+
+const getDashboard = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.getDashboard(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Dashboard data fetched',
+    data: result
+  });
+});
+
 
 export const WillController = {
   createWill,
@@ -252,8 +275,9 @@ export const WillController = {
   addDistributions,
   bulkUpdateDistributions,
   addBackupDistributor,
-  
+  getPetCaretakers,
   updateBackupDistributor,
   deleteBackupDistributor,
   deleteEstateDistribution,
+  getDashboard,
 };

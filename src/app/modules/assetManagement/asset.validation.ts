@@ -1,113 +1,115 @@
-import { z } from "zod";
-import { AssetType, LoanType, PropertyType } from "@prisma/client";
 
-// Property Validation
-const createPropertyValidationSchema = z.object({
-  body: z.object({
-    propertyType: z.nativeEnum(PropertyType),
-    country: z.string().optional(),
-    streetAddress: z.string().min(1, "Street address is required"),
-    unitNumber: z.string().optional(),
-    postalCode: z.string().optional(),
-    isJoint: z.boolean().optional(),
-    estimatedValue: z.number().positive("Estimated value must be positive").optional(),
-  }),
+import { PropertyType,  LoanType } from "@prisma/client";
+
+import { z } from 'zod';
+import { AssetType, CoverType } from '@prisma/client';
+
+const createAssetSchema = z.object({
+  type: z.nativeEnum(AssetType),
+  isJointlyOwned: z.boolean().optional(),
+  isNominated: z.boolean().optional(),
+  approximateValue: z.number().positive().optional(),
+  description: z.string().optional(),
+  institutionName: z.string().optional(),
+  accountNumber: z.string().optional(),
+  companyName: z.string().optional(),
+  policyNumber: z.string().optional(),
+  coverType: z.nativeEnum(CoverType).optional(),
+  maturityDate: z.string().datetime().optional(),
+  faceValue: z.number().positive().optional(),
 });
 
-const updatePropertyValidationSchema = z.object({
-  body: z.object({
-    country: z.string().optional(),
-    streetAddress: z.string().min(1, "Street address is required").optional(),
-    unitNumber: z.string().optional(),
-    postalCode: z.string().optional(),
-    isJoint: z.boolean().optional(),
-    estimatedValue: z.number().positive("Estimated value must be positive").optional(),
-  }),
-});
+// const createAssetValidationSchema = z.object({
+//   body: z.object({
+//     category: z.nativeEnum(AssetCategory),
+//     name: z.string().min(1, "Name is required"),
+//     description: z.string().optional(),
+//     estimatedValue: z.number().positive().optional(),
 
-// Asset Validation
-const createAssetValidationSchema = z.object({
-  body: z.object({
-    assetType: z.nativeEnum(AssetType),
-    institutionName: z.string().min(1, "Institution name is required"),
-    accountNumber: z.string().optional(),
-    isJoint: z.boolean().optional(),
-    isNominated: z.boolean().optional(),
-    approximateValue: z.number().positive("Value must be positive").optional(),
-    cryptoWalletAddress: z.string().optional(),
-    cryptoType: z.string().optional(),
-    description: z.string().optional(),
-  }).superRefine((data, ctx) => {
-    // Crypto-specific validation
-    if (data.assetType === AssetType.CRYPTO && !data.cryptoWalletAddress) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["cryptoWalletAddress"],
-        message: "Crypto wallet address is required for crypto assets",
-      });
-    }
-  }),
-});
+//     // Property fields
+//     propertyType: z.nativeEnum(PropertyType).optional(),
+//     country: z.string().optional(),
+//     streetAddress: z.string().optional(),
+//     unitNumber: z.string().optional(),
+//     postalCode: z.string().optional(),
+//     isJoint: z.boolean().optional(),
+
+//     // Financial fields
+//     assetType: z.nativeEnum(AssetType).optional(),
+//     institutionName: z.string().optional(),
+//     accountNumber: z.string().optional(),
+//     isNominated: z.boolean().optional(),
+//     cryptoWalletAddress: z.string().optional(),
+//     cryptoType: z.string().optional(),
+
+//     // Loan fields
+//     loanType: z.nativeEnum(LoanType).optional(),
+//     institutionNameLoan: z.string().optional(),
+//     accountNumberLoan: z.string().optional(),
+//     approximateBalance: z.number().positive().optional(),
+
+//     // Advisor fields
+//     email: z.string().email().optional(),
+//     phone: z.string().optional(),
+//     firm: z.string().optional(),
+//     specialization: z.string().optional(),
+//   }).superRefine((data, ctx) => {
+//     if (data.category === 'PROPERTY' && !data.streetAddress) {
+//       ctx.addIssue({ code: 'custom', path: ['streetAddress'], message: 'Street address is required for property' });
+//     }
+//     if ((data.category === 'FINANCIAL' || data.category === 'LOAN') && !data.institutionName && !data.institutionNameLoan) {
+//       ctx.addIssue({ code: 'custom', path: ['institutionName'], message: 'Institution name is required' });
+//     }
+//     if (data.category === 'ADVISOR' && !data.email) {
+//       ctx.addIssue({ code: 'custom', path: ['email'], message: 'Email is required for advisor' });
+//     }
+//   }),
+// });
 
 const updateAssetValidationSchema = z.object({
   body: z.object({
-    institutionName: z.string().min(1, "Institution name is required").optional(),
-    accountNumber: z.string().optional(),
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    estimatedValue: z.number().positive().optional(),
+    propertyType: z.nativeEnum(PropertyType).optional(),
+    country: z.string().optional(),
+    streetAddress: z.string().optional(),
+    unitNumber: z.string().optional(),
+    postalCode: z.string().optional(),
     isJoint: z.boolean().optional(),
+    assetType: z.nativeEnum(AssetType).optional(),
+    institutionName: z.string().optional(),
+    accountNumber: z.string().optional(),
     isNominated: z.boolean().optional(),
-    approximateValue: z.number().positive("Value must be positive").optional(),
     cryptoWalletAddress: z.string().optional(),
     cryptoType: z.string().optional(),
-    description: z.string().optional(),
-  }),
-});
-
-// Loan Validation
-const createLoanValidationSchema = z.object({
-  body: z.object({
-    loanType: z.nativeEnum(LoanType),
-    institutionName: z.string().min(1, "Institution or person name is required"),
-    accountNumber: z.string().optional(),
-    approximateBalance: z.number().positive("Balance must be positive").optional(),
-  }),
-});
-
-const updateLoanValidationSchema = z.object({
-  body: z.object({
-    institutionName: z.string().min(1, "Institution name is required").optional(),
-    accountNumber: z.string().optional(),
-    approximateBalance: z.number().positive("Balance must be positive").optional(),
-  }),
-});
-
-// Advisor Validation
-const createAdvisorValidationSchema = z.object({
-  body: z.object({
-    name: z.string().min(1, "Advisor name is required"),
-    email: z.string().email("Invalid email").optional(),
+    loanType: z.nativeEnum(LoanType).optional(),
+    institutionNameLoan: z.string().optional(),
+    accountNumberLoan: z.string().optional(),
+    approximateBalance: z.number().positive().optional(),
+    email: z.string().email().optional(),
     phone: z.string().optional(),
     firm: z.string().optional(),
     specialization: z.string().optional(),
   }),
 });
 
-const updateAdvisorValidationSchema = z.object({
+const linkAssetToWillValidationSchema = z.object({
   body: z.object({
-    name: z.string().min(1, "Advisor name is required").optional(),
-    email: z.string().email("Invalid email").optional(),
-    phone: z.string().optional(),
-    firm: z.string().optional(),
-    specialization: z.string().optional(),
+    assetId: z.string().min(1, "Asset ID is required"),
+  }),
+});
+
+const unlinkAssetFromWillValidationSchema = z.object({
+  body: z.object({
+    assetId: z.string().min(1, "Asset ID is required"),
   }),
 });
 
 export const assetValidation = {
-  createPropertyValidationSchema,
-  updatePropertyValidationSchema,
-  createAssetValidationSchema,
+  createAssetSchema,
+  // createAssetValidationSchema,
   updateAssetValidationSchema,
-  createLoanValidationSchema,
-  updateLoanValidationSchema,
-  createAdvisorValidationSchema,
-  updateAdvisorValidationSchema,
+  linkAssetToWillValidationSchema,
+  unlinkAssetFromWillValidationSchema,
 };

@@ -32,6 +32,9 @@ model Will {
   willGifts             WillGift[]
   petCaretakers         PetCaretaker[]
   
+
+
+
   @@unique([userId])
   @@map("wills")
 }

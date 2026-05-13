@@ -7,6 +7,8 @@ import { willValidation } from "./will.validation";
 const router = express.Router();
 
 // ========== WILL BASICS ==========
+router.get('/dashboard', auth(), WillController.getDashboard);
+
 router.post("/", auth(), WillController.createWill);
 
 router.get("/", auth(), WillController.getMyWill);
@@ -70,6 +72,7 @@ router.post(
 router.delete("/gifts/:id", auth(), WillController.deleteWillGift);
 
 // ========== PET CARETAKERS ==========
+// Add caretaker to ALL pets
 router.post(
   "/pet-caretakers",
   auth(),
@@ -77,17 +80,27 @@ router.post(
   WillController.addPetCaretaker
 );
 
+// Get all pet caretakers
+router.get(
+  "/pet-caretakers",
+  auth(),
+  WillController.getPetCaretakers
+);
+
+// Update all pet caretakers (bulk update)
 router.put(
-  "/pet-caretakers/:id",
+  "/pet-caretakers",
   auth(),
   validateRequest(willValidation.updatePetCaretakerValidationSchema),
   WillController.updatePetCaretaker
 );
 
-router.delete("/pet-caretakers/:id", auth(), WillController.deletePetCaretaker);
-
-
-
+// Delete all pet caretakers
+router.delete(
+  "/pet-caretakers",
+  auth(),
+  WillController.deletePetCaretaker
+);
 
 // ========== DISTRIBUTIONS (Updated) ==========
 

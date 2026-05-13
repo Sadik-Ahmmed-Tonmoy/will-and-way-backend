@@ -556,63 +556,341 @@ const deleteWillGift = async (userId: string, willGiftId: string) => {
 
 // ========== PET CARETAKER SERVICES ==========
 
+// ========== PET CARETAKER SERVICES ==========
+
+// Get all pets for the user
+const getUserPets = async (userId: string) => {
+  const pets = await prisma.people.findMany({
+    where: {
+      userId,
+      relationType: 'PET',
+    },
+    select: {
+      id: true,
+      fullName: true,
+      dateOfBirth: true,
+    },
+  });
+
+  return pets;
+};
+
+// Add caretaker to ALL pets at once
 const addPetCaretaker = async (userId: string, payload: IAddPetCaretaker) => {
   const will = await prisma.will.findUnique({ where: { userId } });
   if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
 
-  const pet = await prisma.people.findFirst({ where: { id: payload.petId, userId, relationType: 'PET' } });
-  if (!pet) throw new ApiError(httpStatus.NOT_FOUND, 'Pet not found');
+  // Validate caretaker exists and belongs to user
+  const caretaker = await prisma.people.findFirst({
+    where: { id: payload.caretakerId, userId },
+  });
 
-  const caretaker = await prisma.people.findFirst({ where: { id: payload.caretakerId, userId } });
   if (!caretaker) throw new ApiError(httpStatus.NOT_FOUND, 'Caretaker not found');
 
-  return prisma.petCaretaker.create({
-    data: {
-      willId: will.id,
-      petId: payload.petId,
-      caretakerId: payload.caretakerId,
-      cashAllocation: payload.cashAllocation,
-      notes: payload.notes,
-    },
-    include: {
-      pet: { select: { id: true, fullName: true } },
-      caretaker: { select: { id: true, fullName: true, email: true } },
-    },
-  });
-};
+  // Get all user's pets
+  const pets = await getUserPets(userId);
 
-const updatePetCaretaker = async (userId: string, caretakerId: string, payload: IUpdatePetCaretaker) => {
-  const will = await prisma.will.findUnique({ where: { userId } });
-  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
-
-  const petCaretaker = await prisma.petCaretaker.findFirst({ where: { id: caretakerId, willId: will.id } });
-  if (!petCaretaker) throw new ApiError(httpStatus.NOT_FOUND, 'Pet caretaker not found');
-
-  if (payload.caretakerId) {
-    const caretaker = await prisma.people.findFirst({ where: { id: payload.caretakerId, userId } });
-    if (!caretaker) throw new ApiError(httpStatus.NOT_FOUND, 'Caretaker not found');
+  if (pets.length === 0) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No pets found. Please add pets first.');
   }
 
-  return prisma.petCaretaker.update({
-    where: { id: caretakerId },
-    data: payload,
-    include: {
-      pet: { select: { id: true, fullName: true } },
-      caretaker: { select: { id: true, fullName: true, email: true } },
+  // Delete existing pet caretakers for all pets (replace all)
+  await prisma.petCaretaker.deleteMany({
+    where: {
+      willId: will.id,
+      petId: { in: pets.map(pet => pet.id) },
     },
   });
+
+  // Create caretaker for each pet
+  const createdCaretakers = await prisma.$transaction(
+    pets.map((pet, index) =>
+      prisma.petCaretaker.create({
+        data: {
+          willId: will.id,
+          petId: pet.id,
+          caretakerId: payload.caretakerId,
+          cashAllocation: payload.cashAllocation,
+          notes: payload.notes,
+          order: index + 1,
+        },
+        include: {
+          pet: {
+            select: { id: true, fullName: true },
+          },
+          caretaker: {
+            select: { id: true, fullName: true, email: true, relationType: true },
+          },
+        },
+      })
+    )
+  );
+
+  return {
+    // message: `Caretaker assigned to ${pets.length} pet(s)`,
+    // caretaker: {
+    //   id: caretaker.id,
+    //   fullName: caretaker.fullName,
+    //   email: caretaker.email,
+    //   relationType: caretaker.relationType,
+    // },
+    // pets: pets.map(pet => ({
+    //   id: pet.id,
+    //   fullName: pet.fullName,
+    // })),
+    petCaretakers: createdCaretakers,
+    totalPets: pets.length,
+    cashAllocation: payload.cashAllocation || null,
+    notes: payload.notes || null,
+  };
 };
 
-const deletePetCaretaker = async (userId: string, caretakerId: string) => {
+// Update pet caretaker (updates all pets' caretakers if caretakerId changed)
+const updatePetCaretaker = async (userId: string, payload: IUpdatePetCaretaker) => {
   const will = await prisma.will.findUnique({ where: { userId } });
   if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
 
-  const petCaretaker = await prisma.petCaretaker.findFirst({ where: { id: caretakerId, willId: will.id } });
-  if (!petCaretaker) throw new ApiError(httpStatus.NOT_FOUND, 'Pet caretaker not found');
+  // If changing caretaker, validate new caretaker
+  if (payload.caretakerId) {
+    const newCaretaker = await prisma.people.findFirst({
+      where: { id: payload.caretakerId, userId },
+    });
+    if (!newCaretaker) throw new ApiError(httpStatus.NOT_FOUND, 'New caretaker not found');
+  }
 
-  await prisma.petCaretaker.delete({ where: { id: caretakerId } });
-  return { id: caretakerId, deleted: true };
+  // Get all current pet caretakers for this will
+  const existingCaretakers = await prisma.petCaretaker.findMany({
+    where: { willId: will.id },
+  });
+
+  if (existingCaretakers.length === 0) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No pet caretakers found');
+  }
+
+  // Update all pet caretakers with new data
+  const updatedCaretakers = await prisma.$transaction(
+    existingCaretakers.map(pc =>
+      prisma.petCaretaker.update({
+        where: { id: pc.id },
+        data: {
+          caretakerId: payload.caretakerId || pc.caretakerId,
+          cashAllocation: payload.cashAllocation !== undefined ? payload.cashAllocation : pc.cashAllocation,
+          notes: payload.notes !== undefined ? payload.notes : pc.notes,
+        },
+        include: {
+          pet: {
+            select: { id: true, fullName: true },
+          },
+          caretaker: {
+            select: { id: true, fullName: true, email: true, relationType: true },
+          },
+        },
+      })
+    )
+  );
+
+  return {
+    // message: `Updated ${updatedCaretakers.length} pet caretaker(s)`,
+    petCaretakers: updatedCaretakers,
+  };
 };
+
+// Delete all pet caretakers for the user
+const deletePetCaretaker = async (userId: string) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+
+  const deletedCaretakers = await prisma.petCaretaker.findMany({
+    where: { willId: will.id },
+  });
+
+  if (deletedCaretakers.length === 0) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No pet caretakers found');
+  }
+
+  await prisma.petCaretaker.deleteMany({
+    where: { willId: will.id },
+  });
+
+  return {
+    message: `Deleted ${deletedCaretakers.length} pet caretaker(s)`,
+    deleted: true,
+    count: deletedCaretakers.length,
+  };
+};
+
+// Get all pet caretakers with details
+const getPetCaretakers = async (userId: string) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+
+  const petCaretakers = await prisma.petCaretaker.findMany({
+    where: { willId: will.id },
+    include: {
+      pet: {
+        select: { id: true, fullName: true, dateOfBirth: true },
+      },
+      caretaker: {
+        select: { id: true, fullName: true, email: true, relationType: true },
+      },
+    },
+    orderBy: { order: 'asc' },
+  });
+
+  // Group by caretaker for summary
+  const caretakerSummary = petCaretakers.reduce((summary: any, pc) => {
+    const key = pc.caretaker.id;
+    if (!summary[key]) {
+      summary[key] = {
+        caretaker: pc.caretaker,
+        pets: [],
+        totalCashAllocation: 0,
+        notes: pc.notes,
+      };
+    }
+    summary[key].pets.push({
+      id: pc.pet.id,
+      fullName: pc.pet.fullName,
+    });
+    summary[key].totalCashAllocation += pc.cashAllocation || 0;
+    return summary;
+  }, {});
+
+  return {
+    petCaretakers,
+    summary: Object.values(caretakerSummary),
+    totalPets: petCaretakers.length,
+  };
+};
+
+const getDashboard = async (userId: string) => {
+  // 1. Get user's basic info + family members
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { fullName: true, profileImage: true }
+  });
+
+  const family = await prisma.people.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'asc' }
+  });
+
+  // 2. Get will and related data
+  const will = await prisma.will.findUnique({
+    where: { userId },
+    include: {
+      executors: {
+        include: {
+          person: true,
+          backupPerson: true
+        }
+      },
+      estateDistributions: {
+        include: {
+          person: true,
+          backupDistributors: { include: { person: true } }
+        }
+      },
+      willGifts: {
+        include: {
+          gift: {
+            include: {
+              recipients: { include: { recipient: true } }
+            }
+          }
+        }
+      },
+      petCaretakers: {
+        include: {
+          pet: true,
+          caretaker: true
+        }
+      }
+    }
+  });
+
+  // 3. Assets grouped by type
+  const allAssets = await prisma.asset.findMany({ where: { userId } });
+  // const financialAssets = allAssets.filter(a => 
+  //   ['BANK_ACCOUNT', 'INVESTMENT_ACCOUNT', 'RETIREMENT_ACCOUNT', 'INSURANCE_PLAN', 'CRYPTO'].includes(a.type)
+  // );
+  // const otherAssets = allAssets.filter(a => 
+  //   ['BUSINESS_INTEREST', 'SAFE_DEPOSIT_BOX'].includes(a.type)
+  // );
+
+  const financialAssets = await prisma.asset.findMany({
+    where: {
+      userId,
+      type: {
+        in: [
+          "BANK_ACCOUNT",
+          "INVESTMENT_ACCOUNT",
+          "BUSINESS_INTEREST",
+          "RETIREMENT_ACCOUNT",
+          "INSURANCE_PLAN",
+          "SAFE_DEPOSIT_BOX",
+          "CRYPTO"
+        ]
+      }
+    }
+  });
+
+  // const otherAssets = await prisma.asset.findMany({
+  //   where: {
+  //     userId,
+  //     type: {
+  //       in: [
+  //         'BUSINESS_INTEREST',
+  //         'SAFE_DEPOSIT_BOX'
+  //       ]
+  //     }
+  //   }
+  // });
+
+  const properties = await prisma.property.findMany({ where: { userId } });
+  const loans = await prisma.loan.findMany({ where: { userId } });
+
+  // 4. Compute total estate value (approx)
+  const totalFinancial = financialAssets.reduce((sum, a) => sum + (a.approximateValue || 0), 0);
+  const totalProperties = properties.reduce((sum, p) => sum + p.estimatedValue, 0);
+  // const totalOther = otherAssets.reduce((sum, a) => sum + (a.approximateValue || 0), 0);
+  const totalLoansGiven = loans.filter(l => l.type === 'GIVEN').reduce((sum, l) => sum + l.approximateBalance, 0);
+  const totalOutstanding = loans.filter(l => l.type === 'OUTSTANDING').reduce((sum, l) => sum + l.approximateBalance, 0);
+
+  const netWorth = totalFinancial + totalProperties + 
+  // totalOther + 
+  totalLoansGiven - totalOutstanding;
+
+  return {
+    user: { name: user?.fullName, profileImage: user?.profileImage },
+    family,
+    executors: will?.executors || [],
+    estateDistributions: will?.estateDistributions || [],
+    gifts: will?.willGifts.map(wg => ({
+      id: wg.id,
+      recipientName: wg.gift.recipients[0]?.recipient.fullName,
+      giftType: wg.gift.giftType,
+      amount: wg.gift.amount,
+      description: wg.gift.description
+    })) || [],
+    petCaretakers: will?.petCaretakers || [],
+    assets: {
+      financialAssets,
+      properties,
+      // otherAssets,
+      loans
+    },
+    summary: {
+      totalFinancial,
+      totalProperties,
+      // totalOther,
+      totalLoansGiven,
+      totalOutstanding,
+      netWorth
+    }
+  };
+};
+
 
 export const WillServices = {
   createWill,
@@ -627,6 +905,7 @@ export const WillServices = {
   deleteEstateDistribution,
   addWillGift,
   deleteWillGift,
+  getPetCaretakers,
   addPetCaretaker,
   updatePetCaretaker,
   deletePetCaretaker,
@@ -636,5 +915,6 @@ export const WillServices = {
   addDistributions,
   bulkUpdateDistributions,
   addBackupDistributor,
+  getDashboard,
 
 };
