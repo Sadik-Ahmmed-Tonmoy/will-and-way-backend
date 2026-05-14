@@ -155,7 +155,12 @@ const bulkUpdateDistributionsValidationSchema = z.object({
   }),
 });
 
-
+const addBackupExecutorValidationSchema = z.object({
+  body: z.object({
+    executorId: z.string().min(1, "Executor ID is required"),
+    backupPeopleId: z.string().min(1, "Backup person ID is required"),
+  }),
+});
 
 
 
@@ -174,5 +179,5 @@ export const willValidation = {
   addBackupDistributorValidationSchema,
   updateBackupDistributorValidationSchema,
   bulkUpdateDistributionsValidationSchema,
-  
+  addBackupExecutorValidationSchema,
 };

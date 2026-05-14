@@ -125,7 +125,7 @@ const getProfile = async (userId: string) => {
           typeOfIdentifier: true,
           identifierValue: true,
           dateOfBirth: true,
-          relationWithUser: true,
+          // relationWithUser: true,
           governmentIssuedId: true,
           relationType: true,
           createdAt: true,
@@ -169,8 +169,7 @@ const addPerson = async (userId: string, payload: IAddPerson) => {
       await prisma.will.create({
         data: {
           userId,
-          status: WillStatus.DRAFT,
-          step: 1,
+          status: WillStatus.DRAFT
         },
       });
     }

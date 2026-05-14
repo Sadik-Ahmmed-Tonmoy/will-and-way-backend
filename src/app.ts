@@ -6,22 +6,27 @@ import globalErrorHandler from './app/middlewares/globalErrorHandler';
 import router from './app/routes';
 
 import morgan from 'morgan';
-import { WebhookRoutes } from './helpars/webhook.routes';
 import { cancelTemplate } from './lib/stripe/cancelTemplete';
 import { successTemplate } from './lib/stripe/successTemplete';
 
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
- 
-import { bookingExpirationQueue } from './queues/bookingExpiration.queue';
-import { captainHireExpirationQueue } from './queues/captainHireExpiration.queue';
+
 import { messagePersistenceQueue } from './queues/messagePersistence.queue';
-import { paymentCaptureQueue } from './queues/paymentCapture.queue';
+import { WebhookRoutes } from './stripeSubscription/stripe.webhook';
 
 // import { PaymentService } from "./app/modules/Payment/payment.service";
 
 const app: Application = express();
+
+// 1. Webhook FIRST (needs raw Buffer body)
+app.use(
+  '/payment-webhook',
+  express.raw({ type: 'application/json' }),
+  WebhookRoutes,
+);
+
 
 app.use(
   cors({
@@ -36,11 +41,11 @@ app.use(
   }),
 );
 
-app.use(
-  '/payment-webhook',
-  // express.raw({ type: 'application/json' }),
-  WebhookRoutes,
-);
+// app.use(
+//   '/payment-webhook',
+//   // express.raw({ type: 'application/json' }),
+//   WebhookRoutes,
+// );
 
 // app.use('/webhook', WebhookRoutes);
 //parser

@@ -38,14 +38,10 @@ const getMyWill = async (userId: string) => {
   const will = await prisma.will.findUnique({
     where: { userId },
     include: {
-      executors: {
+   executors: {
         include: {
-          person: {
-            select: { id: true, fullName: true, email: true, relationType: true },
-          },
-          backupPerson: {
-            select: { id: true, fullName: true, email: true },
-          },
+          person: true,
+          backupPerson: true,
         },
       },
       estateDistributions: {
@@ -53,6 +49,13 @@ const getMyWill = async (userId: string) => {
           person: {
             select: { id: true, fullName: true, email: true },
           },
+          backupDistributors: {
+            include: {
+              person: {
+                select: { id: true, fullName: true, email: true },
+              }
+            }
+          }
         },
       },
       willGifts: {
@@ -84,7 +87,36 @@ const getMyWill = async (userId: string) => {
   });
 
   if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
-  return will;
+
+  const financialAssets = await prisma.asset.findMany({
+    where: {
+      userId,
+      type: {
+        in: [
+          "BANK_ACCOUNT",
+          "INVESTMENT_ACCOUNT",
+          "BUSINESS_INTEREST",
+          "RETIREMENT_ACCOUNT",
+          "INSURANCE_PLAN",
+          "SAFE_DEPOSIT_BOX",
+          "CRYPTO"
+        ]
+      }
+    }
+  });
+
+  const getAdvisors = await prisma.advisor.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
+  const properties = await prisma.property.findMany({ where: { userId } });
+  const loans = await prisma.loan.findMany({ where: { userId } });
+  return {
+    ...will,
+    assets: {
+      financialAssets,
+      properties,
+      loans
+    },
+    advisors: getAdvisors,
+  }
 };
 
 const getFullWill = async (userId: string) => {
@@ -99,7 +131,16 @@ const getFullWill = async (userId: string) => {
       },
       estateDistributions: {
         include: {
-          person: true,
+          person: {
+            select: { id: true, fullName: true, email: true },
+          },
+          backupDistributors: {
+            include: {
+              person: {
+                select: { id: true, fullName: true, email: true },
+              }
+            }
+          }
         },
       },
       willGifts: {
@@ -129,9 +170,10 @@ const getFullWill = async (userId: string) => {
   const properties = await prisma.property.count({ where: { userId } });
   const assets = await prisma.asset.count({ where: { userId } });
   const loans = await prisma.loan.count({ where: { userId } });
-
+  const getAdvisors = await prisma.advisor.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
   return {
     ...will,
+    advisors: getAdvisors,
     assetSummary: {
       properties,
       financialAssets: assets,
@@ -195,6 +237,24 @@ const addExecutor = async (userId: string, payload: IAddExecutor) => {
     },
   });
 };
+
+const addBackupExecutor = async (userId: string, payload: { executorId: string, backupPeopleId: string }) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+  const executor = await prisma.executor.findFirst({ where: { id: payload.executorId, willId: will.id } });
+  if (!executor) throw new ApiError(httpStatus.NOT_FOUND, 'Executor not found');
+  const backupPerson = await prisma.people.findFirst({ where: { id: payload.backupPeopleId, userId } });
+  if (!backupPerson) throw new ApiError(httpStatus.NOT_FOUND, 'Backup person not found');
+
+  return prisma.executor.update({
+    where: { id: payload.executorId },
+    data: { backupPeopleId: payload.backupPeopleId },
+    include: {
+      person: { select: { id: true, fullName: true, email: true, relationType: true } },
+      backupPerson: { select: { id: true, fullName: true, email: true, relationType: true } },
+    },
+  });
+}
 
 const updateExecutor = async (userId: string, executorId: string, payload: IUpdateExecutor) => {
   const will = await prisma.will.findUnique({ where: { userId } });
@@ -280,6 +340,26 @@ const removePersonFromExecutor = async (userId: string, peopleId: string) => {
     deleted: false,
   };
 };
+
+const removeBackupPersonFromExecutor = async (userId: string, peopleId: string) => {
+  const will = await prisma.will.findUnique({ where: { userId } });
+  if (!will) throw new ApiError(httpStatus.NOT_FOUND, 'Will not found');
+
+  // Find all executors where this person is backup
+  const executorsAsBackup = await prisma.executor.findMany({
+    where: { willId: will.id, backupPeopleId: peopleId },
+  });
+
+  // Remove person from backup executor role
+  for (const executor of executorsAsBackup) {
+    await prisma.executor.update({
+      where: { id: executor.id },
+      data: {
+        backupPeopleId: null,
+      },
+    });
+  }
+}
 
 // ========== ESTATE DISTRIBUTION SERVICES ==========
 
@@ -810,7 +890,7 @@ const getDashboard = async (userId: string) => {
   });
 
   // 3. Assets grouped by type
-  const allAssets = await prisma.asset.findMany({ where: { userId } });
+  // const allAssets = await prisma.asset.findMany({ where: { userId } });
   // const financialAssets = allAssets.filter(a => 
   //   ['BANK_ACCOUNT', 'INVESTMENT_ACCOUNT', 'RETIREMENT_ACCOUNT', 'INSURANCE_PLAN', 'CRYPTO'].includes(a.type)
   // );
@@ -857,9 +937,9 @@ const getDashboard = async (userId: string) => {
   const totalLoansGiven = loans.filter(l => l.type === 'GIVEN').reduce((sum, l) => sum + l.approximateBalance, 0);
   const totalOutstanding = loans.filter(l => l.type === 'OUTSTANDING').reduce((sum, l) => sum + l.approximateBalance, 0);
 
-  const netWorth = totalFinancial + totalProperties + 
-  // totalOther + 
-  totalLoansGiven - totalOutstanding;
+  const netWorth = totalFinancial + totalProperties +
+    // totalOther + 
+    totalLoansGiven - totalOutstanding;
 
   return {
     user: { name: user?.fullName, profileImage: user?.profileImage },
@@ -899,9 +979,11 @@ export const WillServices = {
   updateWillStatus,
   updateWillStep,
   addExecutor,
+  addBackupExecutor,
   updateExecutor,
   deleteExecutor,
   removePersonFromExecutor,
+  removeBackupPersonFromExecutor,
   deleteEstateDistribution,
   addWillGift,
   deleteWillGift,

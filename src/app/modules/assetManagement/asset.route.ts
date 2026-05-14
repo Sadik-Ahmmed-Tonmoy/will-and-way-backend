@@ -21,4 +21,10 @@ router.get('/loans/:id', auth(), AssetController.getLoanById);
 router.put('/loans/:id', auth(), AssetController.updateLoan);
 router.delete('/loans/:id', auth(), AssetController.deleteLoan);
 
+router.post('/advisors', auth(), AssetController.createAdvisor);
+router.get('/advisors', auth(), AssetController.getAdvisors);
+router.get('/advisors/:id', auth(), AssetController.getAdvisorById);
+router.put('/advisors/:id', auth(), AssetController.updateAdvisor);
+router.delete('/advisors/:id', auth(), AssetController.deleteAdvisor);
+
 export const AssetRoutes = router;

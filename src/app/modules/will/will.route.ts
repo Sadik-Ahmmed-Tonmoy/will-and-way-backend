@@ -37,6 +37,13 @@ router.post(
   WillController.addExecutor
 );
 
+router.post(
+  "/executors/backup",
+  auth(),
+  validateRequest(willValidation.addBackupExecutorValidationSchema),
+  WillController.addBackupExecutor
+);
+
 router.put(
   "/executors/:id",
   auth(),
@@ -51,6 +58,13 @@ router.delete(
   "/executors/person/:peopleId",
   auth(),
   WillController.removePersonFromExecutor
+);
+
+// Delete backup person from executor (remove backup person reference from executor)
+router.delete(
+  "/executors/backup/person/:peopleId",
+  auth(),
+  WillController.removeBackupPersonFromExecutor
 );
 
 

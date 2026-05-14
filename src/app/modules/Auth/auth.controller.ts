@@ -6,20 +6,19 @@ import sendResponse from '../../../shared/sendResponse';
 import { AuthServices } from './auth.service';
 import catchAsync from '../../utils/catchAsync';
 
-const signup = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.signup(req.body);
+
+const createUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.signupToDb(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: result.isVerified
-      ? 'Verification code sent'
-      : 'Account created successfully',
+    message: 'Please verify your email',
     data: result,
   });
 });
 
-const login = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.login(req.body);
+const loginUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.loginUser(req.body);
 
   if (result.isVerified) {
     res.cookie('accessToken', result.accessToken, {
@@ -28,9 +27,12 @@ const login = catchAsync(async (req: Request, res: Response) => {
       sameSite: 'none',
       secure: true,
     });
+
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
-      maxAge: result.keepMeLogin ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
+      maxAge: result.keepMeLogin
+        ? 30 * 24 * 60 * 60 * 1000
+        : 7 * 24 * 60 * 60 * 1000,
       sameSite: 'none',
       secure: true,
     });
@@ -40,14 +42,18 @@ const login = catchAsync(async (req: Request, res: Response) => {
     statusCode: httpStatus.OK,
     success: true,
     message: result.isVerified
-      ? 'Login successful'
-      : 'Verification code sent',
+      ? 'User logged in successfully'
+      : 'OTP sent successfully',
     data: result,
   });
 });
 
-const socialSignupOrLogin = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.socialSignupOrLogin(req.body);
+const socialLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.socialLogin({
+    email: req.body.email,
+    logInProcess: req.body.logInProcess,
+    fcmToken: req.body.fcmToken,
+  });
 
   if (result.isVerified) {
     res.cookie('accessToken', result.accessToken, {
@@ -56,32 +62,7 @@ const socialSignupOrLogin = catchAsync(async (req: Request, res: Response) => {
       sameSite: 'none',
       secure: true,
     });
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      maxAge: result.keepMeLogin ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'none',
-      secure: true,
-    });
-  }
 
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Social authentication successful',
-    data: result,
-  });
-});
-
-const verifyOTP = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.verifyOTP(req.body);
-
-  if (result.isVerified && result.accessToken) {
-    res.cookie('accessToken', result.accessToken, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'none',
-      secure: true,
-    });
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000,
@@ -93,48 +74,104 @@ const verifyOTP = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'OTP verified successfully',
-    data: result,
-  });
-});
-
-const resendOTP = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.resendOTP(req.body);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'OTP resent successfully',
+    message: result.isVerified
+      ? 'User logged in successfully'
+      : 'OTP sent successfully',
     data: result,
   });
 });
 
 const getMe = catchAsync(async (req: Request, res: Response) => {
-  const user = await AuthServices.getMe(req.user.id);
+  const id = req.user.id;
+  const result = await AuthServices.getMe(id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'User profile fetched',
-    data: user,
+    message: 'User profile fetched successfully',
+    data: result,
   });
 });
 
-const changePassword = catchAsync(async (req: Request, res: Response) => {
-  await AuthServices.changePassword(req.user.id, req.body.oldPassword, req.body.newPassword);
+const getUserForScan = catchAsync(async (req: Request, res: Response) => {
+  const id = req.user.id;
+  const result = await AuthServices.getUserForScan(id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
+    message: 'User profile fetched successfully',
+    data: result,
+  });
+});
+
+const googleLoginWithNextAuth = catchAsync(
+  async (req: Request, res: Response) => {
+    const { isValid, isVerified, accessToken, refreshToken } =
+      await AuthServices.googleLoginWithNextAuth(req.body);
+
+    if (!isValid) {
+      sendResponse(res, {
+        statusCode: httpStatus.BAD_REQUEST,
+        success: false,
+        message: 'Invalid credentials',
+        data: null,
+      });
+      return;
+    }
+    if (isValid && isVerified) {
+      res.cookie('accessToken', accessToken, {
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+        sameSite: 'none',
+        secure: true,
+      });
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        sameSite: 'none',
+        secure: true,
+      });
+    }
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Google login successful',
+      data: isVerified
+        ? {
+            accessToken,
+            refreshToken,
+            isVerified,
+          }
+        : {
+            isVerified,
+          },
+    });
+  },
+);
+
+// change password
+const changePassword = catchAsync(async (req: Request, res: Response) => {
+  const id = req.user.id;
+  const { oldPassword, newPassword } = req.body;
+
+  await AuthServices.changePassword(id, newPassword, oldPassword);
+  sendResponse(res, {
+    success: true,
+    statusCode: 201,
     message: 'Password changed successfully',
     data: null,
   });
 });
 
-const forgotPassword = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.forgotPassword(req.body.email);
+// forgot password
+const forgetPassword = catchAsync(async (req: Request, res: Response) => {
+  const data = await AuthServices.forgetPassword(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Password reset OTP sent',
-    data: result,
+    message: 'Password reset OTP sent to your email',
+    data: data,
   });
 });
 
@@ -149,57 +186,156 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const refreshToken = catchAsync(async (req: Request, res: Response) => {
-  const refreshToken =  req.headers.authorization || req.cookies.refreshToken;
-  console.log("refreshToken", refreshToken);
-  if (!refreshToken) throw new ApiError(httpStatus.UNAUTHORIZED, 'No refresh token');
+  let refreshToken = req.headers['authorization'];
+  if (!refreshToken) {
+    refreshToken = req.cookies.refreshToken;
+  }
+  if (!refreshToken) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Please login first');
+  }
 
-  const result = await AuthServices.refreshToken(refreshToken);
+  // const { refreshToken } = req.cookies;
+  const result = await AuthServices.refreshToken(refreshToken as string);
+
   res.cookie('accessToken', result.accessToken, {
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     sameSite: 'none',
     secure: true,
   });
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Token refreshed',
+    message: 'Token refreshed successfully',
     data: result,
   });
 });
 
-const logout = catchAsync(async (req: Request, res: Response) => {
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
+const logoutUser = catchAsync(async (req: Request, res: Response) => {
+  // Clear the token cookie
+  res.clearCookie('accessToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Logged out successfully',
+    message: 'User Successfully logged out',
     data: null,
   });
 });
 
-const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
-  const user = await AuthServices.updateUserStatus(req.params.id, req.body.status);
+const userStatusUpdate = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id;
+  const { status } = req.body;
+  const user = await AuthServices.userStatusUpdate(id, status);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'User status updated',
+    message: 'User status updated successfully',
     data: user,
   });
 });
 
+const verifyOTP = catchAsync(async (req: Request, res: Response) => {
+  const {
+    isValid,
+    isVerified,
+    accessToken,
+    refreshToken,
+    resetPasswordToken,
+    email,
+  } = await AuthServices.verifyOTP(req.body);
+
+  if (!isValid) {
+    sendResponse(res, {
+      statusCode: httpStatus.BAD_REQUEST,
+      success: false,
+      message: 'Invalid OTP or expired',
+      data: null,
+    });
+    return;
+  }
+  if (isValid && isVerified) {
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: 'none',
+      secure: true,
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      sameSite: 'none',
+      secure: true,
+    });
+  }
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'OTP verified successfully',
+    data: isVerified
+      ? {
+          accessToken,
+          refreshToken,
+          isVerified,
+        }
+      : {
+          isVerified,
+          resetPasswordToken,
+          email,
+        },
+  });
+});
+
+const resendOTP = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.resendOTP(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'OTP resent successfully',
+    data: result,
+  });
+});
+
+const socialSignupOrLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.socialSignupOrLogin(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Social signup/login successful',
+    data: result,
+  });
+});
+
+
+
 export const AuthController = {
-  signup,
-  login,
-  socialSignupOrLogin,
-  verifyOTP,
-  resendOTP,
+  createUser,
+  loginUser,
+  socialLogin,
   getMe,
+  getUserForScan,
+  googleLoginWithNextAuth,
   changePassword,
-  forgotPassword,
+  forgetPassword,
   resetPassword,
   refreshToken,
-  logout,
-  updateUserStatus,
+  logoutUser,
+  userStatusUpdate,
+  verifyOTP,
+  resendOTP,
+  socialSignupOrLogin,
 };

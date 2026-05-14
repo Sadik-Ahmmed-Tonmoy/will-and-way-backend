@@ -3,48 +3,37 @@ import auth from "../../middlewares/auth";
 import validateRequest from "../../middlewares/validateRequest";
 import { AuthController } from "./auth.controller";
 import { authValidation } from "./auth.validation";
+import { fileUploader } from "../../../helpars/fileUploader";
 
 const router = express.Router();
 
-// Unified signup (handles EMAIL, PHONE, SOCIAL via logInProcess field)
-router.post(
-  "/signup",
-  validateRequest(authValidation.signupValidationSchema),
-  AuthController.signup
-);
+// user login route
+router.post("/signup", AuthController.createUser);
 
-// Unified login (identifier can be email or phone)
-router.post(
-  "/login",
-  validateRequest(authValidation.loginValidationSchema),
-  AuthController.login
-);
+router.post("/login", AuthController.loginUser);
 
-// Social signup/login (explicitly for Google/Apple)
-router.post(
-  "/social-signup-login",
-  validateRequest(authValidation.socialSignupLoginValidationSchema),
-  AuthController.socialSignupOrLogin
-);
+router.post("/social-login", AuthController.socialLogin);
 
-// OTP verification (works for both email and phone)
+router.get("/get-me", auth(), AuthController.getMe);
+router.get("/get-me-for-scan", auth(), AuthController.getUserForScan);
+
+router.post("/google-login", AuthController.googleLoginWithNextAuth);
+
 router.post(
   "/verify-otp",
-  validateRequest(authValidation.verifyOTPValidationSchema),
+  validateRequest(authValidation.verify),
   AuthController.verifyOTP
 );
 
-// Resend OTP (works for both email and phone)
+router.post("/social-signup-login", AuthController.socialSignupOrLogin);
+
+
 router.post(
   "/resend-otp",
-  validateRequest(authValidation.resendOTPValidationSchema),
+  validateRequest(authValidation.resend),
   AuthController.resendOTP
 );
 
-// Get current user
-router.get("/me", auth(), AuthController.getMe);
-
-// Change password
 router.put(
   "/change-password",
   auth(),
@@ -52,31 +41,28 @@ router.put(
   AuthController.changePassword
 );
 
-// Forgot password (email only)
 router.post(
-  "/forgot-password",
+  "/forget-password",
   validateRequest(authValidation.forgetPasswordValidationSchema),
-  AuthController.forgotPassword
+  AuthController.forgetPassword
 );
 
-// Reset password
 router.post(
   "/reset-password",
   validateRequest(authValidation.resetPasswordValidationSchema),
   AuthController.resetPassword
 );
 
-// Refresh token
 router.post("/refresh-token", AuthController.refreshToken);
 
-// Logout
-router.post("/logout", AuthController.logout);
 
-// Admin: update user status
+
+router.post("/logout", AuthController.logoutUser);
+
 router.patch(
-  "/user-status/:id",
+  "/user-status-update/:id",
   auth("SUPER_ADMIN", "ADMIN"),
-  AuthController.updateUserStatus
+  AuthController.userStatusUpdate
 );
 
 export const AuthRoutes = router;

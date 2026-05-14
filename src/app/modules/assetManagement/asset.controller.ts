@@ -104,10 +104,49 @@ const deleteLoan = catchAsync(async (req: Request, res: Response) => {
 }
 );
 
+const createAdvisor = catchAsync(async (req: Request, res: Response) => {
+  const result = await AssetService.createAdvisor(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Advisor created',
+    data: result
+  });
+});
 
+const getAdvisors = catchAsync(async (req: Request, res: Response) => {
+  const result = await AssetService.getAdvisors(req.user.id);
+  sendResponse(res,
+    {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Advisors fetched',
+      data: result
+    });
+});
+
+const getAdvisorById = catchAsync(async (req: Request, res: Response) => {
+  const result = await AssetService.getAdvisorById(req.user.id, req.params.id);
+  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Advisor fetched', data: result });
+});
+
+const updateAdvisor = catchAsync(async (req: Request, res: Response) => {
+  const result = await AssetService.updateAdvisor(req.user.id, req.params.id, req.body);
+  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Advisor updated', data: result });
+});
+
+const deleteAdvisor = catchAsync(async (req: Request, res: Response) => {
+  await AssetService.deleteAdvisor(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Advisor deleted',
+    data: null,
+  });
+});
 
 
 export const AssetController = {
   createAsset, getAssets, updateAsset, deleteAsset, createProperty, getProperties, getPropertyById, updateProperty, deleteProperty, createLoan,
-  getLoans, getLoanById, updateLoan, deleteLoan
+  getLoans, getLoanById, updateLoan, deleteLoan, createAdvisor, getAdvisors, getAdvisorById, updateAdvisor, deleteAdvisor
 };

@@ -1,5 +1,5 @@
-import { LogInProcess, OTPPurpose, UserRole, UserStatus } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { LogInProcess, OTPPurpose, UserStatus, UserRole } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import httpStatus from 'http-status';
 import { Secret } from 'jsonwebtoken';
 import config from '../../../config';
@@ -12,224 +12,114 @@ import {
   hashPassword,
 } from '../../../helpars/passwordHelpers';
 import prisma from '../../../shared/prisma';
+import { ForgetPasswordPayload, OTPVerifyPayload } from './auth.interface';
 import { sendEmail } from '../../utils/sendEmail';
-import { ChatService } from '../chat/chat.service'; // 👈 import ChatService
-import {
-  LoginPayload,
-  OTPVerifyPayload,
-  ResendOTPPayload,
-  SocialLoginPayload,
-} from './auth.interface';
 
-// Helper: find user by email or phone
-const findUserByIdentifier = async (identifier: string) => {
-  const isEmail = identifier.includes('@');
-  if (isEmail) {
-    return prisma.user.findUnique({ where: { email: identifier } });
-  } else {
-    return prisma.user.findFirst({ where: { phoneNumber: identifier } });
-  }
-};
+// SIGNUP
+const signupToDb = async (payload: any) => {
+  const { email, password, fcmToken, fullName, phoneNumber, keepMeLogin } =
+    payload;
 
-// Helper: send OTP based on purpose and identifier
-const sendOTP = async (
-  userId: string,
-  identifier: string,
-  purpose: OTPPurpose,
-): Promise<{ id: string; code: string; expiresAt: Date }> => {
-  const code = generateRandomCode(6);
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-  const data: any = {
-    userId,
-    code,
-    purpose,
-    expiresAt,
-  };
-  if (identifier.includes('@')) {
-    data.email = identifier;
-  } else {
-    data.phone = identifier;
-  }
-
-  const otp = await prisma.oTP.create({ data });
-
-  // Send via appropriate channel
-  if (identifier.includes('@')) {
-    const html = otpEmail(code, identifier, `OTP for ${purpose}`);
-    await sendEmail(`Your OTP for ${purpose}`, identifier, html);
-  } else {
-    const message = `Your verification code is: ${code}`;
-    // await sendSMS(identifier, message);
-  }
-
-  return otp;
-};
-
-// SIGNUP (handles EMAIL, PHONE, and even SOCIAL if needed, but social is separate)
-const signup = async (payload: any) => {
-  const {
-    fullName,
-    email,
-    phoneNumber,
-    password,
-    logInProcess,
-    fcmToken,
-    profileImage,
-    role,
-    shortBio,
-    keepMeLogin = false,
-  } = payload;
-
-  // Validate required identifier based on logInProcess
-  if (logInProcess === LogInProcess.EMAIL && !email) {
+  if (!email) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Email is required for email signup',
-    );
-  }
-  if (logInProcess === LogInProcess.PHONE && !phoneNumber) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Phone number is required for phone signup',
-    );
-  }
-  if (
-    (logInProcess === LogInProcess.EMAIL ||
-      logInProcess === LogInProcess.PHONE) &&
-    !password
-  ) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Password is required for this signup method',
+      'Email is required to create an account',
     );
   }
 
-  // Check uniqueness
-  if (email) {
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing)
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Email already registered');
-  }
-  if (phoneNumber) {
-    const existing = await prisma.user.findFirst({ where: { phoneNumber } });
-    if (existing)
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'Phone number already registered',
-      );
-  }
-
-  const hashedPassword = password ? await bcrypt.hash(password, 12) : null;
-
-  // Create user (unverified)
-  const user = await prisma.user.create({
-    data: {
-      fullName,
-      email,
-      phoneNumber,
-      shortBio,
-      password: hashedPassword,
-      logInProcess,
-      fcmToken,
-      profileImage,
-      isVerified: true,
-      isEmailVerified: true,
-      isPhoneVerified: true,
-      role: role || UserRole.USER,
-      status: UserStatus.ACTIVE,
-      salutation: payload.salutation,
-      region: payload.region,
-    },
-  });
-
-  let vendorDetails = null;
-
-
-  const accessToken = jwtHelpers.generateToken(
-    { id: user.id, email: user.email, role: user.role },
-    config.jwt.access_secret as Secret,
-    config.jwt.access_expires_in as string,
-  );
-
-  const refreshToken = jwtHelpers.generateToken(
-    { id: user.id, role: user.role },
-    config.jwt.refresh_secret as Secret,
-    keepMeLogin ? '30d' : (config.jwt.refresh_expires_in as string),
-  );
-  // Determine identifier for OTP
-  // const identifier = logInProcess === LogInProcess.EMAIL ? email! : phoneNumber!;
-  // const purpose =
-  //   logInProcess === LogInProcess.EMAIL
-  //     ? OTPPurpose.EMAIL_VERIFICATION
-  //     : OTPPurpose.PHONE_VERIFICATION;
-
-  // // Generate and send OTP
-  // const otp = await sendOTP(user.id, identifier, purpose);
-
-  const { password: _, ...userWithoutPassword } = user;
-  // return {
-  //   ...userWithoutPassword,
-  //   otp,
-  //   otpSent: true,
-  //   otpId: otp.id,
-  //   expiresAt: otp.expiresAt,
-  // };
-
-  return {
-    ...userWithoutPassword,
-    vendorDetails,
-    accessToken,
-    refreshToken,
-    keepMeLogin,
-  };
-};
-
-// LOGIN (by email or phone)
-const login = async (payload: LoginPayload) => {
-  const { identifier, password, keepMeLogin = false } = payload;
-
-  const user = await findUserByIdentifier(identifier);
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-  }
-
-  if (user.status !== UserStatus.ACTIVE) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Your account is not active');
-  }
-
-  if (!user.password) {
+  const exists = await prisma.user.findUnique({ where: { email } });
+  if (exists) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'This account has no password set',
+      'User with this email already exists',
     );
   }
-  const isPasswordCorrect = await bcrypt.compare(password, user.password);
-  if (!isPasswordCorrect) {
-    throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect password');
+
+  // EMAIL signup requires password
+  if (payload.logInProcess === LogInProcess.EMAIL && !password) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Password is required for EMAIL login process',
+    );
   }
 
-  const isEmailIdentifier = identifier.includes('@');
-  const isVerified = isEmailIdentifier
-    ? user.isEmailVerified
-    : user.isPhoneVerified;
+  let hashedPassword: string | null = null;
+  if (password) hashedPassword = await bcrypt.hash(password, 12);
 
-  if (!isVerified) {
-    const purpose = isEmailIdentifier
-      ? OTPPurpose.EMAIL_VERIFICATION
-      : OTPPurpose.PHONE_VERIFICATION;
-    const otp = await sendOTP(user.id, identifier, purpose);
+  // EMAIL SIGNUP -> user must verify email → send OTP
+  if (payload.logInProcess === LogInProcess.EMAIL) {
+    const result = await prisma.$transaction(async tx => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          fcmToken,
+          logInProcess: payload.logInProcess || LogInProcess.EMAIL,
+          isVerified: false,
+          isProfileCompleted: false,
+          profileImage: payload.profileImage || null,
+          fullName: fullName || '',
+          phoneNumber: phoneNumber || '',
+          role: UserRole.USER,
+          status: UserStatus.ACTIVE,
+        },
+      });
+
+      const otp = await tx.oTP.create({
+        data: {
+          userId: user.id,
+          code: generateRandomCode(6),
+          email: user.email,
+          purpose: OTPPurpose.EMAIL_VERIFICATION,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        },
+      });
+
+      const { password, ...userWithoutPassword } = user;
+      return { user: userWithoutPassword, otp };
+    });
+
+    // Send OTP email AFTER transaction is complete
+    const html = otpEmail(result.otp.code, email, 'OTP for Email Verification');
+
+    // await sendEmailWithBrevo(
+    //   result.user.email,
+    //   "Verify Your Email Address",
+    //   html
+    // );
+
+    await sendEmail('Verify Your Email Address', email, html);
+
     return {
-      email: user.email,
-      phoneNumber: user.phoneNumber,
+      ...result.user,
+      otp: result.otp,
       isVerified: false,
-      otpSent: true,
-      expiresAt: otp.expiresAt,
     };
   }
 
+  // SOCIAL SIGNUP (GOOGLE, APPLE)
+  const user = await prisma.user.create({
+    data: {
+      email,
+      password: hashedPassword,
+      fcmToken,
+      logInProcess: payload.logInProcess,
+      isVerified: true,
+      isProfileCompleted: false,
+      fullName: fullName || '',
+      phoneNumber: phoneNumber || '',
+      role: UserRole.USER,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  // Generate tokens
   const accessToken = jwtHelpers.generateToken(
-    { id: user.id, email: user.email, role: user.role },
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    },
     config.jwt.access_secret as Secret,
     config.jwt.access_expires_in as string,
   );
@@ -237,15 +127,8 @@ const login = async (payload: LoginPayload) => {
   const refreshToken = jwtHelpers.generateToken(
     { id: user.id, role: user.role },
     config.jwt.refresh_secret as Secret,
-    keepMeLogin ? '30d' : (config.jwt.refresh_expires_in as string),
+    config.jwt.refresh_expires_in as string,
   );
-
-  // Fire and forget: sync user conversations for chat
-  Promise.resolve().then(() => {
-    ChatService.syncUserConversations(user.id).catch(err =>
-      console.error('Failed to sync user conversations:', err),
-    );
-  });
 
   return {
     isVerified: true,
@@ -253,18 +136,719 @@ const login = async (payload: LoginPayload) => {
     refreshToken,
     keepMeLogin,
     role: user.role,
-    user: {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      profileImage: user.profileImage,
-    },
   };
 };
 
-// SOCIAL SIGNUP/LOGIN (unchanged from your version, but integrated)
-const socialSignupOrLogin = async (payload: SocialLoginPayload) => {
+// LOGIN
+const loginUser = async (payload: {
+  email: string;
+  password: string;
+  keepMeLogin: boolean;
+}) => {
+  const userData = await prisma.user.findUnique({
+    where: {
+      email: payload.email,
+    },
+  });
+
+  if (!userData) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found with this email');
+  }
+
+  if (userData.logInProcess !== LogInProcess.EMAIL) {
+    throw new ApiError(
+      400,
+      `Please login with your ${userData.logInProcess} Account`,
+    );
+  }
+
+  if (
+    userData.status === UserStatus.INACTIVE ||
+    userData.status === UserStatus.BANNED
+  ) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Your account is Suspended');
+  }
+
+  if (userData.status === UserStatus.BLOCKED) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Your account is Blocked');
+  }
+
+  if (!payload.password || !userData?.password) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'User does not have a password set',
+    );
+  }
+
+  const isCorrectPassword: boolean = await bcrypt.compare(
+    payload.password,
+    userData.password,
+  );
+
+  if (!isCorrectPassword) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Password is incorrect');
+  }
+
+  if (userData?.isVerified === false) {
+    const code = generateRandomCode(6);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const otp = await prisma.oTP.create({
+      data: {
+        userId: userData.id,
+        code,
+        email: userData.email,
+        purpose: OTPPurpose.EMAIL_VERIFICATION,
+        expiresAt,
+      },
+    });
+
+    // Send verification email
+    const html = otpEmail(
+      otp.code,
+      userData.email!,
+      'OTP for Email Verification',
+    );
+    // await sendEmailWithBrevo(userData.email, 'Verify Your Email Address', html);
+    await sendEmail('Verify Your Email Address', userData.email!, html);
+    return {
+      email: userData.email,
+      isVerified: userData.isVerified,
+    };
+  } else {
+    const accessToken = jwtHelpers.generateToken(
+      {
+        id: userData.id,
+        email: userData.email,
+        role: userData.role,
+      },
+      config.jwt.access_secret as Secret,
+      config.jwt.access_expires_in as string,
+    );
+
+    let refreshToken;
+
+    if (payload.keepMeLogin) {
+      refreshToken = jwtHelpers.generateToken(
+        {
+          id: userData.id,
+          role: userData.role,
+        },
+        config.jwt.refresh_secret as Secret,
+        '30d', // Longer expiry for "keep me logged in"
+      );
+    } else {
+      refreshToken = jwtHelpers.generateToken(
+        {
+          id: userData.id,
+          role: userData.role,
+        },
+        config.jwt.refresh_secret as Secret,
+        config.jwt.refresh_expires_in as string,
+      );
+    }
+
+    return {
+      isVerified: userData.isVerified,
+      accessToken,
+      refreshToken,
+      keepMeLogin: payload.keepMeLogin,
+      role: userData.role,
+    };
+  }
+};
+
+const socialLogin = async (payload: {
+  email: string;
+  logInProcess: LogInProcess;
+  fcmToken?: string;
+}) => {
+  console.log(payload);
+  const userData = await prisma.user.findUnique({
+    where: {
+      email: payload.email,
+    },
+  });
+
+  if (!userData) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  if (
+    userData.status === UserStatus.INACTIVE ||
+    userData.status === UserStatus.BANNED
+  ) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Your account is Suspended');
+  }
+
+  if (userData?.isVerified === false) {
+    const code = generateRandomCode(6);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const otp = await prisma.oTP.create({
+      data: {
+        userId: userData.id,
+        code,
+        email: userData.email,
+        purpose: OTPPurpose.EMAIL_VERIFICATION,
+        expiresAt,
+      },
+    });
+
+    // Send verification email
+    const html = otpEmail(
+      otp.code,
+      userData.email!,
+      'OTP for Email Verification',
+    );
+    // await sendEmailWithBrevo(userData.email!, 'Verify Your Email Address', html);
+    await sendEmail('Verify Your Email Address', userData.email!, html);
+
+    return {
+      email: userData.email,
+      isVerified: userData.isVerified,
+    };
+  } else {
+    // update fcm token
+    if (payload.fcmToken && userData.fcmToken !== payload.fcmToken) {
+      await prisma.user.update({
+        where: { id: userData.id },
+        data: { fcmToken: payload.fcmToken },
+      });
+    }
+
+    const accessToken = jwtHelpers.generateToken(
+      {
+        id: userData.id,
+        email: userData.email,
+        role: userData.role,
+      },
+      config.jwt.access_secret as Secret,
+      config.jwt.access_expires_in as string,
+    );
+
+    const refreshToken = jwtHelpers.generateToken(
+      {
+        id: userData.id,
+        role: userData.role,
+      },
+      config.jwt.refresh_secret as Secret,
+      config.jwt.refresh_expires_in as string,
+    );
+
+    return {
+      isVerified: userData.isVerified,
+      accessToken,
+      refreshToken,
+      role: userData.role,
+    };
+  }
+};
+
+const getMe = async (id: string) => {
+  const result = await prisma.user.findUnique({
+    where: { id },
+    select: {
+       id: true,
+      fullName: true,
+      nickname: true,
+      email: true,
+      profileImage: true,
+      region: true,
+      religion: true,
+      maritalStatus: true,
+      phoneNumber: true,
+      role: true,
+      status: true,
+      isVerified: true,
+      isProfileCompleted: true,
+      createdAt: true,
+      addresses: true,
+      payments: true
+    }
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+
+
+  return result;
+};
+
+const getUserForScan = async (id: string) => {
+  const result = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  return result;
+};
+
+const googleLoginWithNextAuth = async (data: any) => {
+  const user = await prisma.user.upsert({
+    where: { email: data.email },
+    update: {
+      logInProcess: LogInProcess.GOOGLE,
+      isVerified: true,
+    },
+    create: {
+      email: data.email,
+      logInProcess: LogInProcess.GOOGLE,
+      isVerified: true,
+      role: UserRole.USER,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  if (user.status === UserStatus.INACTIVE) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Your account is Suspended');
+  }
+
+  if (user.logInProcess !== LogInProcess.GOOGLE) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Please login with your ${user.logInProcess} account`,
+    );
+  }
+
+  const accessToken = jwtHelpers.generateToken(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    config.jwt.access_secret as Secret,
+    config.jwt.access_expires_in as string,
+  );
+
+  const refreshToken = jwtHelpers.generateToken(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    config.jwt.refresh_secret as Secret,
+    config.jwt.refresh_expires_in as string,
+  );
+
+  return { isValid: true, isVerified: true, accessToken, refreshToken, user };
+};
+
+// CHANGE PASSWORD
+const changePassword = async (
+  id: string,
+  newPassword: string,
+  oldPassword: string,
+) => {
+  if (!oldPassword) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Old Password is required');
+  }
+
+  if (!newPassword) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'New Password is required');
+  }
+
+  const userData = await prisma.user.findUnique({
+    where: { id },
+  });
+
+  if (!userData) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No record found with this email');
+  }
+
+  if (userData.logInProcess !== LogInProcess.EMAIL) {
+    throw new ApiError(
+      400,
+      `Please login with your ${userData.logInProcess} account. This account was created using login with ${userData.logInProcess} process.`,
+    );
+  }
+
+  const isCorrectPassword = await comparePassword(
+    oldPassword,
+    userData.password as string,
+  );
+
+  if (!isCorrectPassword) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Incorrect old password!');
+  }
+
+  const hashedPassword = await hashPassword(newPassword);
+
+  await prisma.user.update({
+    where: {
+      id: userData.id,
+    },
+    data: {
+      password: hashedPassword,
+    },
+  });
+
+  return;
+};
+
+const forgetPassword = async (payload: ForgetPasswordPayload) => {
+  const { email } = payload;
+
+  // Check if user exists
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'User not found with this email address',
+    );
+  }
+
+  if (user.logInProcess !== LogInProcess.EMAIL) {
+    throw new ApiError(
+      400,
+      `Please login with ${user.logInProcess} account, because you have registered with ${user.logInProcess}`,
+    );
+  }
+
+  // Check if user account is active
+  if (user.status !== UserStatus.ACTIVE) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User account is not active');
+  }
+
+  // Generate OTP for password reset
+  const code = generateRandomCode(6);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const otp = await prisma.oTP.create({
+    data: {
+      userId: user.id,
+      code,
+      email: user.email,
+      purpose: OTPPurpose.PASSWORD_RESET,
+      expiresAt,
+    },
+  });
+
+  // Send verification email
+  const html = otpEmail(otp.code, user.email!, 'OTP for Password Reset');
+  // await sendEmailWithBrevo(user.email!, 'Reset your password', html);
+  await sendEmail('Reset your password', user.email!, html);
+
+  return {
+    email: user.email,
+    role: user.role,
+    logInProcess: user.logInProcess,
+    purpose: otp.purpose,
+    status: user.status,
+    isVerified: user.isVerified,
+    expiresAt: otp.expiresAt,
+  };
+};
+
+// RESET PASSWORD
+const resetPassword = async (payload: {
+  email: string;
+  token: string;
+  password: string;
+}) => {
+  const userData = await prisma.user.findUnique({
+    where: {
+      email: payload.email,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  if (!userData) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  const isValidToken = jwtHelpers.verifyToken(
+    payload.token,
+    config.jwt.access_secret as Secret,
+  );
+
+  if (!isValidToken) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid or expired token');
+  }
+
+  // hash password
+  const hashedPassword = await hashPassword(payload.password);
+
+  // update into database
+  await prisma.user.update({
+    where: {
+      email: payload.email,
+    },
+    data: {
+      password: hashedPassword,
+    },
+  });
+
+  return { message: 'Password reset successfully' };
+};
+
+// REFRESH TOKEN
+const refreshToken = async (refreshToken: string) => {
+  const decodedToken = jwtHelpers.verifyToken(
+    refreshToken,
+    config.jwt.refresh_secret as Secret,
+  );
+
+  if (!decodedToken) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Refresh token expired or invalid',
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: decodedToken.id,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  const accessToken = jwtHelpers.generateToken(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    config.jwt.access_secret as Secret,
+    config.jwt.access_expires_in as string,
+  );
+
+  return { accessToken };
+};
+
+const userStatusUpdate = async (id: string, status: UserStatus) => {
+  const user = await prisma.user.findUnique({
+    where: { id },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data: { status },
+  });
+
+  return updatedUser;
+};
+
+const generateOTP = async (
+  email: string,
+  purpose: OTPPurpose,
+): Promise<{ id: string }> => {
+  // First, find the user by email
+  const user = await prisma.user.findUnique({
+    where: { email: email },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  // Generate new OTP code
+  const code = generateRandomCode(6);
+
+  // Set expiration time (10 minutes from now)
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+  // Create new OTP
+  const otp = await prisma.oTP.create({
+    data: {
+      email: user.email,
+      code,
+      userId: user.id,
+      purpose,
+      expiresAt,
+    },
+  });
+
+  // Send OTP via email
+  const html = otpEmail(
+    otp.code,
+    user.email!,
+    `OTP for ${purpose == OTPPurpose.EMAIL_VERIFICATION ? 'Email Verification' : 'Password Reset'}`,
+  );
+
+  // await sendEmailWithBrevo(
+  //   user.email,
+  //   `OTP for ${purpose == OTPPurpose.EMAIL_VERIFICATION ? 'Email Verification' : 'Password Reset'}`,
+  //   html,
+  // );
+
+  await sendEmail(
+    `OTP for ${purpose == OTPPurpose.EMAIL_VERIFICATION ? 'Email Verification' : 'Password Reset'}`,
+    user.email!,
+    html,
+  );
+
+  return { id: otp.id };
+};
+
+const verifyOTP = async (payload: OTPVerifyPayload) => {
+  const { email, code, purpose } = payload;
+
+  // First, find the user by email
+  const user = await prisma.user.findUnique({
+    where: { email: email },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  // Find the valid OTP for this user
+  const otp = await prisma.oTP.findFirst({
+    where: {
+      userId: user.id,
+      code,
+      purpose,
+      used: false,
+      expiresAt: { gt: new Date() },
+    },
+  });
+
+  if (!otp) {
+    return { isValid: false, user };
+  }
+
+  // Mark OTP as used
+  await prisma.oTP.update({
+    where: { id: otp.id },
+    data: { used: true },
+  });
+
+  if (purpose === OTPPurpose.EMAIL_VERIFICATION) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+      },
+    });
+
+    const accessToken = jwtHelpers.generateToken(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      config.jwt.access_secret as Secret,
+      config.jwt.access_expires_in as string,
+    );
+
+    const refreshToken = jwtHelpers.generateToken(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      config.jwt.refresh_secret as Secret,
+      config.jwt.refresh_expires_in as string,
+    );
+
+    return {
+      isValid: true,
+      isVerified: true,
+      accessToken,
+      refreshToken,
+      user,
+    };
+  } else {
+    const resetPasswordToken = jwtHelpers.generateToken(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      config.jwt.access_secret as Secret,
+      config.jwt.access_expires_in as string,
+    );
+
+    return {
+      isValid: true,
+      isVerified: false,
+      resetPasswordToken,
+      email,
+      user,
+    };
+  }
+};
+
+const resendOTP = async (payload: { email: string; purpose: OTPPurpose }) => {
+  // First, find the user by email
+  const user = await prisma.user.findUnique({
+    where: { email: payload?.email, status: UserStatus.ACTIVE },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  // Generate new OTP code
+  const code = generateRandomCode(6);
+
+  // Set expiration time (10 minutes from now)
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+  // Create new OTP
+  const otp = await prisma.oTP.create({
+    data: {
+      userId: user.id,
+      code,
+      email: user.email,
+      purpose: payload.purpose,
+      expiresAt,
+    },
+  });
+
+  const html = otpEmail(
+    otp.code,
+    user.email!,
+    `OTP for ${payload.purpose == OTPPurpose.EMAIL_VERIFICATION ? 'Email Verification' : 'Password Reset'}`,
+  );
+
+  // await sendEmailWithBrevo(
+  //   user.email,
+  //   `OTP for ${payload.purpose == OTPPurpose.EMAIL_VERIFICATION ? 'Email Verification' : 'Password Reset'}`,
+  //   html,
+  // );
+  await sendEmail(`OTP for ${payload.purpose == OTPPurpose.EMAIL_VERIFICATION ? 'Email Verification' : 'Password Reset'}`,
+     user.email!, html);
+
+  return {
+    email: user.email,
+    role: user.role,
+    logInProcess: user.logInProcess,
+    status: user.status,
+    isVerified: user.isVerified,
+    expiresAt: otp.expiresAt,
+  };
+};
+
+const socialSignupOrLogin = async (payload: {
+  email: string;
+  logInProcess: LogInProcess;
+  fcmToken?: string;
+  fullName?: string;
+  phoneNumber?: string;
+  profileImage?: string;
+  keepMeLogin?: boolean;
+}) => {
   const {
     email,
     logInProcess,
@@ -275,16 +859,34 @@ const socialSignupOrLogin = async (payload: SocialLoginPayload) => {
     keepMeLogin = false,
   } = payload;
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
 
+  // If user exists -> LOGIN
   if (existingUser) {
+    // Check if user is trying to login with different social provider
     if (existingUser.logInProcess !== logInProcess) {
-      throw new ApiError(400, `Please login with ${existingUser.logInProcess}`);
-    }
-    if (existingUser.status !== UserStatus.ACTIVE) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'Account suspended');
+      throw new ApiError(
+        400,
+        `Please login with your ${existingUser.logInProcess} account`,
+      );
     }
 
+    // Check account status
+    if (
+      existingUser.status === UserStatus.INACTIVE ||
+      existingUser.status === UserStatus.BANNED
+    ) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Your account is Suspended');
+    }
+
+    if (existingUser.status === UserStatus.BLOCKED) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Your account is Blocked');
+    }
+
+    // Update FCM token if provided and different
     if (fcmToken && existingUser.fcmToken !== fcmToken) {
       await prisma.user.update({
         where: { id: existingUser.id },
@@ -292,20 +894,44 @@ const socialSignupOrLogin = async (payload: SocialLoginPayload) => {
       });
     }
 
+    // If user is not verified, send OTP
     if (!existingUser.isVerified) {
-      const otp = await sendOTP(
-        existingUser.id,
-        email,
-        OTPPurpose.EMAIL_VERIFICATION,
+      const code = generateRandomCode(6);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      const otp = await prisma.oTP.create({
+        data: {
+          userId: existingUser.id,
+          code,
+          email: existingUser.email,
+          purpose: OTPPurpose.EMAIL_VERIFICATION,
+          expiresAt,
+        },
+      });
+
+      // Send verification email
+      const html = otpEmail(
+        otp.code,
+        existingUser.email!,
+        'OTP for Email Verification',
       );
+
+      // await sendEmailWithBrevo(
+      //   existingUser.email,
+      //   'Verify Your Email Address',
+      //   html,
+      // );
+
+      await sendEmail('Verify Your Email Address', existingUser.email!, html);
+
       return {
-        email,
-        isVerified: false,
-        otpSent: true,
-        expiresAt: otp.expiresAt,
+        email: existingUser.email,
+        isVerified: existingUser.isVerified,
+        needsVerification: true,
       };
     }
 
+    // Generate tokens for verified user
     const accessToken = jwtHelpers.generateToken(
       {
         id: existingUser.id,
@@ -315,18 +941,28 @@ const socialSignupOrLogin = async (payload: SocialLoginPayload) => {
       config.jwt.access_secret as Secret,
       config.jwt.access_expires_in as string,
     );
-    const refreshToken = jwtHelpers.generateToken(
-      { id: existingUser.id, role: existingUser.role },
-      config.jwt.refresh_secret as Secret,
-      keepMeLogin ? '30d' : (config.jwt.refresh_expires_in as string),
-    );
 
-    // Fire and forget: sync user conversations for chat
-    Promise.resolve().then(() => {
-      ChatService.syncUserConversations(existingUser.id).catch(err =>
-        console.error('Failed to sync user conversations:', err),
+    let refreshToken;
+
+    if (keepMeLogin) {
+      refreshToken = jwtHelpers.generateToken(
+        {
+          id: existingUser.id,
+          role: existingUser.role,
+        },
+        config.jwt.refresh_secret as Secret,
+        '30d', // Longer expiry for "keep me logged in"
       );
-    });
+    } else {
+      refreshToken = jwtHelpers.generateToken(
+        {
+          id: existingUser.id,
+          role: existingUser.role,
+        },
+        config.jwt.refresh_secret as Secret,
+        config.jwt.refresh_expires_in as string,
+      );
+    }
 
     return {
       isVerified: true,
@@ -336,47 +972,77 @@ const socialSignupOrLogin = async (payload: SocialLoginPayload) => {
       role: existingUser.role,
       user: {
         id: existingUser.id,
-        fullName: existingUser.fullName,
         email: existingUser.email,
+        fullName: existingUser.fullName,
         phoneNumber: existingUser.phoneNumber,
         profileImage: existingUser.profileImage,
+        role: existingUser.role,
+        status: existingUser.status,
+        logInProcess: existingUser.logInProcess,
       },
     };
   }
 
+  // If user doesn't exist -> SIGNUP
+  const isSocialSignup =
+    logInProcess === LogInProcess.GOOGLE || logInProcess === LogInProcess.APPLE;
+
+  if (!isSocialSignup) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Only social login (GOOGLE/APPLE) is supported for this endpoint',
+    );
+  }
+
+  // Create new user
   const newUser = await prisma.user.create({
     data: {
       email,
-      fullName: fullName || '',
-      phoneNumber,
-      profileImage,
+      password: null, // Social login doesn't need password
       fcmToken,
       logInProcess,
-      isVerified: true,
-      isEmailVerified: true,
-      isPhoneVerified: false,
+      isVerified: true, // Social logins are considered verified
+      isProfileCompleted: false,
+      fullName: fullName || '',
+      phoneNumber: phoneNumber || '',
+      profileImage: profileImage || null,
       role: UserRole.USER,
       status: UserStatus.ACTIVE,
     },
   });
 
+  // Generate tokens
   const accessToken = jwtHelpers.generateToken(
-    { id: newUser.id, email: newUser.email, role: newUser.role },
+    {
+      id: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+    },
     config.jwt.access_secret as Secret,
     config.jwt.access_expires_in as string,
   );
-  const refreshToken = jwtHelpers.generateToken(
-    { id: newUser.id, role: newUser.role },
-    config.jwt.refresh_secret as Secret,
-    keepMeLogin ? '30d' : (config.jwt.refresh_expires_in as string),
-  );
 
-  // Fire and forget: sync user conversations for chat
-  Promise.resolve().then(() => {
-    ChatService.syncUserConversations(newUser.id).catch(err =>
-      console.error('Failed to sync user conversations:', err),
+  let refreshToken;
+
+  if (keepMeLogin) {
+    refreshToken = jwtHelpers.generateToken(
+      {
+        id: newUser.id,
+        role: newUser.role,
+      },
+      config.jwt.refresh_secret as Secret,
+      '30d', // Longer expiry for "keep me logged in"
     );
-  });
+  } else {
+    refreshToken = jwtHelpers.generateToken(
+      {
+        id: newUser.id,
+        role: newUser.role,
+      },
+      config.jwt.refresh_secret as Secret,
+      config.jwt.refresh_expires_in as string,
+    );
+  }
 
   return {
     isVerified: true,
@@ -386,227 +1052,31 @@ const socialSignupOrLogin = async (payload: SocialLoginPayload) => {
     role: newUser.role,
     user: {
       id: newUser.id,
-      fullName: newUser.fullName,
       email: newUser.email,
+      fullName: newUser.fullName,
       phoneNumber: newUser.phoneNumber,
       profileImage: newUser.profileImage,
+      role: newUser.role,
+      status: newUser.status,
+      logInProcess: newUser.logInProcess,
     },
   };
-};
-
-// VERIFY OTP (handles both email and phone)
-const verifyOTP = async (payload: OTPVerifyPayload) => {
-  const { identifier, code, purpose } = payload;
-
-  const user = await findUserByIdentifier(identifier);
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-
-  const otp = await prisma.oTP.findFirst({
-    where: {
-      userId: user.id,
-      code,
-      purpose,
-      used: false,
-      expiresAt: { gt: new Date() },
-      ...(identifier.includes('@')
-        ? { email: identifier }
-        : { phone: identifier }),
-    },
-  });
-
-  if (!otp) {
-    return { isValid: false };
-  }
-
-  await prisma.oTP.update({ where: { id: otp.id }, data: { used: true } });
-
-  const updateData: any = {};
-  if (purpose === OTPPurpose.EMAIL_VERIFICATION) {
-    updateData.isEmailVerified = true;
-    updateData.isVerified = true; // you can adjust logic
-  } else if (purpose === OTPPurpose.PHONE_VERIFICATION) {
-    updateData.isPhoneVerified = true;
-    updateData.isVerified = true;
-  } else if (purpose === OTPPurpose.PASSWORD_RESET) {
-    const resetToken = jwtHelpers.generateToken(
-      { id: user.id, email: user.email },
-      config.jwt.access_secret as Secret,
-      '15m',
-    );
-    return {
-      isValid: true,
-      isVerified: false,
-      resetPasswordToken: resetToken,
-      email: user.email,
-    };
-  }
-
-  if (Object.keys(updateData).length > 0) {
-    await prisma.user.update({ where: { id: user.id }, data: updateData });
-  }
-
-  const accessToken = jwtHelpers.generateToken(
-    { id: user.id, email: user.email, role: user.role },
-    config.jwt.access_secret as Secret,
-    config.jwt.access_expires_in as string,
-  );
-  const refreshToken = jwtHelpers.generateToken(
-    { id: user.id, role: user.role },
-    config.jwt.refresh_secret as Secret,
-    config.jwt.refresh_expires_in as string,
-  );
-  return {
-    isValid: true,
-    isVerified: true,
-    accessToken,
-    refreshToken,
-  };
-};
-
-// RESEND OTP
-const resendOTP = async (payload: ResendOTPPayload) => {
-  const { identifier, purpose } = payload;
-
-  const user = await findUserByIdentifier(identifier);
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-
-  const otp = await sendOTP(user.id, identifier, purpose);
-  return {
-    email: user.email,
-    phoneNumber: user.phoneNumber,
-    expiresAt: otp.expiresAt,
-    otpId: otp.id,
-  };
-};
-
-// GET ME
-const getMe = async (userId: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      phoneNumber: true,
-      profileImage: true,
-      role: true,
-      status: true,
-      isEmailVerified: true,
-      isPhoneVerified: true,
-      isVerified: true,
-      createdAt: true,
-      vendorProfile: true,
-    },
-  });
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-  return user;
-};
-
-// CHANGE PASSWORD
-const changePassword = async (
-  userId: string,
-  oldPassword: string,
-  newPassword: string,
-) => {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-
-  if (
-    user.logInProcess !== LogInProcess.EMAIL &&
-    user.logInProcess !== LogInProcess.PHONE
-  ) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Password change not allowed for social accounts',
-    );
-  }
-
-  const isMatch = await comparePassword(oldPassword, user.password!);
-  if (!isMatch)
-    throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect old password');
-
-  const hashed = await hashPassword(newPassword);
-  await prisma.user.update({
-    where: { id: userId },
-    data: { password: hashed },
-  });
-};
-
-// FORGOT PASSWORD (email only for now)
-const forgotPassword = async (email: string) => {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-
-  if (user.logInProcess !== LogInProcess.EMAIL) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Password reset not supported for this account type',
-    );
-  }
-
-  const otp = await sendOTP(user.id, email, OTPPurpose.PASSWORD_RESET);
-  return { email, expiresAt: otp.expiresAt };
-};
-
-// RESET PASSWORD (after OTP verification, using token)
-const resetPassword = async (payload: {
-  email: string;
-  token: string;
-  password: string;
-}) => {
-  const { email, token, password } = payload;
-  const decoded = jwtHelpers.verifyToken(
-    token,
-    config.jwt.access_secret as Secret,
-  );
-  if (!decoded)
-    throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid or expired token');
-
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-
-  const hashed = await hashPassword(password);
-  await prisma.user.update({ where: { email }, data: { password: hashed } });
-};
-
-// REFRESH TOKEN
-const refreshToken = async (refreshToken: string) => {
-  const decoded = jwtHelpers.verifyToken(
-    refreshToken,
-    config.jwt.refresh_secret as Secret,
-  );
-  if (!decoded)
-    throw new ApiError(httpStatus.FORBIDDEN, 'Invalid refresh token');
-
-  const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-
-  const newAccessToken = jwtHelpers.generateToken(
-    { id: user.id, email: user.email, role: user.role },
-    config.jwt.access_secret as Secret,
-    config.jwt.access_expires_in as string,
-  );
-  return { accessToken: newAccessToken };
-};
-
-// UPDATE USER STATUS (admin)
-const updateUserStatus = async (userId: string, status: UserStatus) => {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-
-  return prisma.user.update({ where: { id: userId }, data: { status } });
 };
 
 export const AuthServices = {
-  signup,
-  login,
-  socialSignupOrLogin,
-  verifyOTP,
-  resendOTP,
+  signupToDb,
+  loginUser,
+  socialLogin,
   getMe,
+  getUserForScan,
+  googleLoginWithNextAuth,
   changePassword,
-  forgotPassword,
+  forgetPassword,
   resetPassword,
   refreshToken,
-  updateUserStatus,
+  userStatusUpdate,
+  generateOTP,
+  verifyOTP,
+  resendOTP,
+  socialSignupOrLogin,
 };

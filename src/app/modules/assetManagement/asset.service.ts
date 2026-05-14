@@ -119,9 +119,50 @@ const deleteLoan = async (userId: string, loanId: string) => {
   return { deleted: true };
 }
 
+const createAdvisor = async (userId: string, data: any) => {
+  return prisma.advisor.create({
+    data: {
+      userId,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,  
+    },
+  });
+};
+
+const getAdvisors = async (userId: string) =>
+  prisma.advisor.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
+
+const getAdvisorById = async (userId: string, advisorId: string) => {
+  const advisor = await prisma.advisor.findFirst({ where: { id: advisorId, userId } });
+  if (!advisor) throw new ApiError(httpStatus.NOT_FOUND, 'Advisor not found');
+  return advisor;
+}
+
+const updateAdvisor = async (userId: string, advisorId: string, data: any) => {
+  const advisor = await prisma.advisor.findFirst({ where: { id: advisorId, userId } });
+  if (!advisor) throw new ApiError(httpStatus.NOT_FOUND, 'Advisor not found');
+  return prisma.advisor.update({
+    where: { id: advisorId },
+    data: {
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+    },
+  });
+}
+
+const deleteAdvisor = async (userId: string, advisorId: string) => {
+  const advisor = await prisma.advisor.findFirst({ where: { id: advisorId, userId } });
+  if (!advisor) throw new ApiError(httpStatus.NOT_FOUND, 'Advisor not found');
+  await prisma.advisor.delete({ where: { id: advisorId } });
+  return { deleted: true };
+}
+
+
 
 export const AssetService = {
-  createAsset, getAssetsByUser, updateAsset, deleteAsset, createProperty, getProperties, getPropertyById, updateProperty, deleteProperty, createLoan, getLoans, getLoanById, updateLoan, deleteLoan
-
+  createAsset, getAssetsByUser, updateAsset, deleteAsset, createProperty, getProperties, getPropertyById, updateProperty,
+   deleteProperty, createLoan, getLoans, getLoanById, updateLoan, deleteLoan, createAdvisor, getAdvisors, getAdvisorById, updateAdvisor, deleteAdvisor
 };
 

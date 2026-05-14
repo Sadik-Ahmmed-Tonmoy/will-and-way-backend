@@ -1,97 +1,128 @@
 import { z } from "zod";
-import { LogInProcess, OTPPurpose, UserRole } from "@prisma/client";
 
-const phoneSchema = z.string().min(8, "Phone number must be at least 8 characters").max(25, "Phone number must not exceed 25 characters");
-
-const signupValidationSchema = z.object({
-  body: z.object({
-    fullName: z.string().optional(),
-    email: z.string().email().optional(),
-    phoneNumber: phoneSchema.optional(),
-    role: z.nativeEnum(UserRole).optional(),
-    password: z.string().min(8, "Password must be at least 8 characters").optional(),
-    logInProcess: z.nativeEnum(LogInProcess),
-    fcmToken: z.string().optional(),
-    profileImage: z.string().optional(),
-    keepMeLogin: z.boolean().optional(),
-    shortBio: z.string().max(160, "Short bio must not exceed 160 characters").optional(),
-  }).refine(data => {
-    // If logInProcess is EMAIL or PHONE, the respective identifier must be present
-    if (data.logInProcess === LogInProcess.EMAIL && !data.email) {
-      return false;
-    }
-    if (data.logInProcess === LogInProcess.PHONE && !data.phoneNumber) {
-      return false;
-    }
-    return true;
-  }, {
-    message: "Missing required identifier for the chosen login method",
-  }),
+const userValidationSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email(),
+  phoneNumber: z
+    .string()
+    .min(8, "Phone number must be at least 8 characters")
+    .max(25, "Phone number must not exceed 25 characters")
+    .optional(),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .optional(),
 });
 
 const loginValidationSchema = z.object({
-  body: z.object({
-    identifier: z.string().min(1, "Email or phone number is required"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    keepMeLogin: z.boolean().optional(),
-  }),
+  email: z.string().email(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  keepMeLogin: z.boolean().optional(),
 });
 
-const socialSignupLoginValidationSchema = z.object({
+const updateProfileSchema = z.object({
   body: z.object({
-    email: z.string().email(),
-    logInProcess: z.enum([LogInProcess.GOOGLE, LogInProcess.APPLE]),
-    fcmToken: z.string().optional(),
-    fullName: z.string().optional(),
-    phoneNumber: phoneSchema.optional(),
+    firstName: z.string().min(1, "First name is required").optional(),
+    lastName: z.string().min(1, "Last name is required").optional(),
+    email: z.string().email().optional(),
+    phoneNumber: z
+      .string()
+      .min(8, "Phone number must be at least 8 characters")
+      .max(25, "Phone number must not exceed 25 characters")
+      .optional(),
+    address: z.string().optional(),
+    postCode: z.string().optional(),
     profileImage: z.string().optional(),
-    keepMeLogin: z.boolean().optional(),
+    purchasedAdvertisements: z
+      .array(z.object({
+        id: z.string().uuid().optional(),
+        title: z.string().min(2).max(100),
+        price: z.number().min(1),
+        packageValidateDateRange: z.any().optional(),
+            createdAt: z.any().optional(),
+            carValue: z.string().min(1).optional(),
+            sellerType: z.string().min(1).optional(),
+            vehicleType: z.string().min(1).optional(),
+            duration: z.string().min(1).optional(),
+      }))
+      .optional(),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .optional(),
   }),
 });
 
 const changePasswordValidationSchema = z.object({
   body: z.object({
-    oldPassword: z.string().min(8, "Old password must be at least 8 characters"),
-    newPassword: z.string().min(8, "New password must be at least 8 characters"),
+    oldPassword: z
+      .string()
+      .min(8, "Old password must be at least 8 characters"),
+    newPassword: z
+      .string()
+      .min(8, "New password must be at least 8 characters"),
   }),
 });
 
 const forgetPasswordValidationSchema = z.object({
   body: z.object({
-    email: z.string().email(),
+    email: z.string().email({ message: "Invalid email address" }),
   }),
 });
 
 const resetPasswordValidationSchema = z.object({
   body: z.object({
-    email: z.string().email(),
-    password: z.string().min(6, "New password must be at least 6 characters"),
-    token: z.string(),
+    email: z
+      .string({
+        required_error: "Email is required",
+      })
+      .email({ message: "Invalid email address" }),
+    password: z
+      .string({
+        required_error: "New password is required",
+      })
+      .min(6, "New password must be at least 6 characters"),
+    token: z.string({
+      required_error: "Reset token is required",
+    }),
   }),
 });
 
-const verifyOTPValidationSchema = z.object({
+const verify = z.object({
   body: z.object({
-    identifier: z.string().min(1, "Email or phone is required"),
-    code: z.string().length(6, "Code must be 6 digits"),
-    purpose: z.nativeEnum(OTPPurpose),
+    email: z
+      .string({
+        required_error: "Email is required",
+      })
+      .email({ message: "Invalid email address" }),
+    code: z.string({ required_error: "OTP code is required" }),
+    purpose: z.enum(["EMAIL_VERIFICATION", "PASSWORD_RESET"] as const, {
+      required_error: "Purpose is required",
+    }),
   }),
 });
 
-const resendOTPValidationSchema = z.object({
+const resend = z.object({
   body: z.object({
-    identifier: z.string().min(1, "Email or phone is required"),
-    purpose: z.nativeEnum(OTPPurpose),
+    email: z
+      .string({
+        required_error: "Email is required",
+      })
+      .email({ message: "Invalid email address" }),
+    purpose: z.enum(["EMAIL_VERIFICATION", "PASSWORD_RESET"] as const, {
+      required_error: "Purpose is required",
+    }),
   }),
 });
 
 export const authValidation = {
-  signupValidationSchema,
+  userValidationSchema,
   loginValidationSchema,
-  socialSignupLoginValidationSchema,
   changePasswordValidationSchema,
+  updateProfileSchema,
   forgetPasswordValidationSchema,
   resetPasswordValidationSchema,
-  verifyOTPValidationSchema,
-  resendOTPValidationSchema,
+  verify,
+  resend
 };

@@ -3,10 +3,9 @@ import { AssetRoutes } from './../modules/assetManagement/asset.route';
 import express from 'express';
 import { AuthRoutes } from '../modules/Auth/auth.routes';
 import { ChatRoutes } from '../modules/chat/chat.routes';
-import { ReviewRoutes } from '../modules/review/review.routes';
-import { SubscriptionRoutes } from '../modules/subscription/subscription.routes';
 import { ProfileRoutes } from '../modules/User/user.routes';
 import { GiftRoutes } from '../modules/gift/gift.routes';
+import { PaymentRoutes } from '../modules/payment/payment.routes';
 
 const router = express.Router();
 
@@ -23,19 +22,6 @@ const moduleRoutes = [
     path: '/chat',
     route: ChatRoutes,
   },
-
-
-
-  {
-    path: '/reviews',
-    route: ReviewRoutes,
-  },
-
- 
-  {
-    path: '/subscription',
-    route: SubscriptionRoutes,
-  },
   {
     path: '/gifts',
     route: GiftRoutes,
@@ -49,6 +35,10 @@ const moduleRoutes = [
   {
     path: '/will',
     route: WillRoutes,
+  },
+  {
+    path: '/payments',
+    route: PaymentRoutes,
   },
   
 

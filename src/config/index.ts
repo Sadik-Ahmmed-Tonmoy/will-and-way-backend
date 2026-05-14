@@ -36,8 +36,15 @@ export default {
   },
   stripe: {
     published_key: process.env.STRIPE_PUBLISHED_KEY,
-    stripe_secret_key: process.env.STRIPE_SECRET_KEY,
-    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+
+        secretKey: process.env.STRIPE_SECRET_KEY!,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
+    // These will be set dynamically
+    essentialPriceId: process.env.STRIPE_ESSENTIAL_PRICE_ID || '',
+    unlimitedPriceId: process.env.STRIPE_UNLIMITED_PRICE_ID || '',
+    successUrl: process.env.FRONTEND_SUCCESS_URL!,
+    cancelUrl: process.env.FRONTEND_CANCEL_URL!,
+
   },
 
   twilio: {

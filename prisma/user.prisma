@@ -10,6 +10,8 @@ enum UserStatus {
   ACTIVE
   BLOCKED
   DELETED
+  INACTIVE
+  BANNED
 }
 
 enum LogInProcess {
@@ -118,6 +120,7 @@ model User {
   properties Property[]
   loans      Loan[]
   advisors   Advisor[]
+  payments   Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -164,7 +167,7 @@ model People {
   typeOfIdentifier   TypeOfIdentifier?
   identifierValue    String?
   dateOfBirth        DateTime?
-  relationWithUser   RelationType?
+  // relationWithUser   RelationType?
   governmentIssuedId Boolean?          @default(false)
   relationType       RelationType
 

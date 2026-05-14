@@ -8,6 +8,7 @@ import { setupSocket } from './socket';
 import { messageWorker } from './workers/messagePersistence.worker';
 import {  seedDemoUser } from './app/DB/seedCategories';
 import dns from 'dns';
+import { initializeStripeProducts } from './app/utils/stripe';
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 dns.setDefaultResultOrder('ipv4first');
 
@@ -18,6 +19,7 @@ async function main() {
     console.log('🚀 Server is running on port', port);
     await initiateSuperAdmin();
     await seedDemoUser();
+    await initializeStripeProducts();
     console.log('🎉 Seeding complete!');
   });
 

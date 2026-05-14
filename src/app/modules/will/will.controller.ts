@@ -66,6 +66,16 @@ const addExecutor = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const addBackupExecutor = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.addBackupExecutor(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Backup executor added successfully',
+    data: result,
+  });
+});
+
 const updateExecutor = catchAsync(async (req: Request, res: Response) => {
   const result = await WillServices.updateExecutor(req.user.id, req.params.id, req.body);
   sendResponse(res, {
@@ -96,6 +106,16 @@ const removePersonFromExecutor = catchAsync(async (req: Request, res: Response) 
   });
 }
 );
+
+const removeBackupPersonFromExecutor = catchAsync(async (req: Request, res: Response) => {
+  const result = await WillServices.removeBackupPersonFromExecutor(req.user.id, req.params.peopleId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Backup person removed from executor successfully',
+    data: result,
+  });
+});
 
 
 // ========== DISTRIBUTION CONTROLLERS ==========
@@ -263,9 +283,11 @@ export const WillController = {
   updateWillStatus,
   updateWillStep,
   addExecutor,
+  addBackupExecutor,
   updateExecutor,
   deleteExecutor,
   removePersonFromExecutor,
+  removeBackupPersonFromExecutor,
   addWillGift,
   deleteWillGift,
   addPetCaretaker,

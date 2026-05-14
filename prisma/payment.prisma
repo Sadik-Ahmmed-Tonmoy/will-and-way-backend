@@ -1,0 +1,43 @@
+// Add this model to your schema.prisma
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  ONE_TIME
+  SUBSCRIPTION
+}
+
+model Payment {
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String        @db.ObjectId
+  stripePaymentIntentId String?   @unique
+  stripeSubscriptionId String?    @unique
+  stripeCustomerId  String?
+  amount           Float
+  currency         String        @default("usd")
+  status           PaymentStatus @default(PENDING)
+  type             PaymentType
+  productId        String        // "essential_will" or "unlimited_legacy"
+  metadata         Json?         // extra info like willId
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+}
+
+model storePaymentInfo {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  value     String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
