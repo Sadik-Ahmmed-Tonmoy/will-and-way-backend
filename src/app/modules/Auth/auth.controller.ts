@@ -237,7 +237,7 @@ const logoutUser = catchAsync(async (req: Request, res: Response) => {
 const userStatusUpdate = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id;
   const { status } = req.body;
-  const user = await AuthServices.userStatusUpdate(id, status);
+  const user = await AuthServices.userStatusUpdate(id as string, status);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

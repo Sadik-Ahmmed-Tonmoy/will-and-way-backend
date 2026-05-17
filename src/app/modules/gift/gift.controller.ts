@@ -27,7 +27,7 @@ const getGifts = catchAsync(async (req: Request, res: Response) => {
 
 const getGiftById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await GiftServices.getGiftById(req.user.id, id);
+  const result = await GiftServices.getGiftById(req.user.id, id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -38,7 +38,7 @@ const getGiftById = catchAsync(async (req: Request, res: Response) => {
 
 const updateGift = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await GiftServices.updateGift(req.user.id, id, req.body);
+  const result = await GiftServices.updateGift(req.user.id, id as string, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -49,7 +49,7 @@ const updateGift = catchAsync(async (req: Request, res: Response) => {
 
 const deleteGift = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await GiftServices.deleteGift(req.user.id, id);
+  const result = await GiftServices.deleteGift(req.user.id, id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

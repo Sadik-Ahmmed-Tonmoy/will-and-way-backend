@@ -15,12 +15,12 @@ const getAssets = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateAsset = catchAsync(async (req: Request, res: Response) => {
-  const result = await AssetService.updateAsset(req.user.id, req.params.id, req.body);
+  const result = await AssetService.updateAsset(req.user.id, req.params.id as string, req.body);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Asset updated', data: result });
 });
 
 const deleteAsset = catchAsync(async (req: Request, res: Response) => {
-  await AssetService.deleteAsset(req.user.id, req.params.id);
+  await AssetService.deleteAsset(req.user.id, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -40,18 +40,18 @@ const getProperties = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getPropertyById = catchAsync(async (req: Request, res: Response) => {
-  const result = await AssetService.getPropertyById(req.user.id, req.params.id);
+  const result = await AssetService.getPropertyById(req.user.id, req.params.id as string);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Property fetched', data: result });
 }
 );
 
 const updateProperty = catchAsync(async (req: Request, res: Response) => {
-  const result = await AssetService.updateProperty(req.user.id, req.params.id, req.body);
+  const result = await AssetService.updateProperty(req.user.id, req.params.id as string, req.body);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Property updated', data: result });
 });
 
 const deleteProperty = catchAsync(async (req: Request, res: Response) => {
-  await AssetService.deleteProperty(req.user.id, req.params.id);
+  await AssetService.deleteProperty(req.user.id, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -84,17 +84,17 @@ const getLoans = catchAsync(async (req: Request, res: Response) => {
 );
 
 const getLoanById = catchAsync(async (req: Request, res: Response) => {
-  const result = await AssetService.getLoanById(req.user.id, req.params.id);
+  const result = await AssetService.getLoanById(req.user.id, req.params.id as string);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Loan fetched', data: result });
 });
 
 const updateLoan = catchAsync(async (req: Request, res: Response) => {
-  const result = await AssetService.updateLoan(req.user.id, req.params.id, req.body);
+  const result = await AssetService.updateLoan(req.user.id, req.params.id as string, req.body);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Loan updated', data: result });
 });
 
 const deleteLoan = catchAsync(async (req: Request, res: Response) => {
-  await AssetService.deleteLoan(req.user.id, req.params.id);
+  await AssetService.deleteLoan(req.user.id, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -126,17 +126,17 @@ const getAdvisors = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAdvisorById = catchAsync(async (req: Request, res: Response) => {
-  const result = await AssetService.getAdvisorById(req.user.id, req.params.id);
+  const result = await AssetService.getAdvisorById(req.user.id, req.params.id as string);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Advisor fetched', data: result });
 });
 
 const updateAdvisor = catchAsync(async (req: Request, res: Response) => {
-  const result = await AssetService.updateAdvisor(req.user.id, req.params.id, req.body);
+  const result = await AssetService.updateAdvisor(req.user.id, req.params.id as string, req.body);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: 'Advisor updated', data: result });
 });
 
 const deleteAdvisor = catchAsync(async (req: Request, res: Response) => {
-  await AssetService.deleteAdvisor(req.user.id, req.params.id);
+  await AssetService.deleteAdvisor(req.user.id, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

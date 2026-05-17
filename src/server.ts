@@ -4,7 +4,6 @@ import app from './app';
 import { initiateSuperAdmin } from './app/DB';
 import config from './config';
 import { redis } from './lib/redis';
-import { setupSocket } from './socket';
 import { messageWorker } from './workers/messagePersistence.worker';
 import {  seedDemoUser } from './app/DB/seedCategories';
 import dns from 'dns';
@@ -35,7 +34,6 @@ async function main() {
       credentials: true,
     },
   });
-  setupSocket(io);
 
   // redis shutdown handler
   process.on('SIGINT', async () => {

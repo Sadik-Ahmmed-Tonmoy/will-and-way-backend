@@ -31,7 +31,7 @@ const updateAddress = catchAsync(async (req: Request, res: Response) => {
 
   const { id } = req.params;
   const { country, streetAddress, unitNumber, postCode } = req.body;
-  const result = await ProfileServices.updateAddress(req.user.id, id, country, streetAddress, unitNumber, postCode);
+  const result = await ProfileServices.updateAddress(req.user.id, id as string, country, streetAddress, unitNumber, postCode);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -86,7 +86,7 @@ const getPeopleByType = catchAsync(async (req: Request, res: Response) => {
 
 const updatePerson = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await ProfileServices.updatePerson(req.user.id, id, req.body);
+  const result = await ProfileServices.updatePerson(req.user.id, id as string, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -97,7 +97,7 @@ const updatePerson = catchAsync(async (req: Request, res: Response) => {
 
 const deletePerson = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await ProfileServices.deletePerson(req.user.id, id);
+  const result = await ProfileServices.deletePerson(req.user.id, id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

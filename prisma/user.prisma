@@ -106,6 +106,8 @@ model User {
   fcmToken           String?
   isProfileCompleted Boolean        @default(false)
 
+  stripeCustomerId  String?  
+  
   subscriptionTier      SubscriptionTier @default(FREE)
   subscriptionExpiresAt DateTime?
 

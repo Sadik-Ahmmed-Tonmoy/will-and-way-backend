@@ -2,7 +2,6 @@ import { WillRoutes } from './../modules/will/will.route';
 import { AssetRoutes } from './../modules/assetManagement/asset.route';
 import express from 'express';
 import { AuthRoutes } from '../modules/Auth/auth.routes';
-import { ChatRoutes } from '../modules/chat/chat.routes';
 import { ProfileRoutes } from '../modules/User/user.routes';
 import { GiftRoutes } from '../modules/gift/gift.routes';
 import { PaymentRoutes } from '../modules/payment/payment.routes';
@@ -18,10 +17,7 @@ const moduleRoutes = [
     path: '/profile',
     route: ProfileRoutes,
   },
-  {
-    path: '/chat',
-    route: ChatRoutes,
-  },
+
   {
     path: '/gifts',
     route: GiftRoutes,

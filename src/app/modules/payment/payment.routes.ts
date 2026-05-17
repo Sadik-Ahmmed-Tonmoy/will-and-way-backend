@@ -6,52 +6,55 @@ import { paymentValidation } from './payment.validation';
 
 const router = express.Router();
 
-/**
- * POST /api/v1/payments/checkout
- * Body: { productType: 'essential_will' | 'unlimited_legacy' }
- * Returns: { sessionUrl, sessionId }
- * Frontend should redirect to sessionUrl.
- */
-
+// ─── Stripe Webhook ───────────────────────────────────────────────────────────
+// CRITICAL: This route must use express.raw() to receive the raw body.
+// Stripe signature verification will fail if the body is parsed as JSON first.
+// Register this route BEFORE any global express.json() middleware in app.ts.
 router.post(
-  '/checkout',
-  auth(),
-  validateRequest(paymentValidation.createCheckoutSessionSchema),
-  PaymentController.createCheckoutSession,
+  '/webhook',
+  express.raw({ type: 'application/json' }),
+  PaymentController.stripeWebhook,
 );
 
-// router.post(
-//   "/checkout",
-//   (req, res, next) => {
-//     console.log(req.body, "ssssssssssssssssssss");
-//     next();
-//   },
-//   validateRequest(paymentValidation.createCheckoutSessionSchema),
-//   PaymentController.createCheckoutSession
-// );
+// ─── Checkout ─────────────────────────────────────────────────────────────────
 
-/**
- * GET /api/v1/payments/status
- * Returns purchase/subscription status for the authenticated user.
+/** POST /api/v1/payments/checkout/essential-will
+ * Body: { successUrl: string, cancelUrl: string }
+ * Returns: { checkoutUrl: string, sessionId: string }
  */
-router.get('/status', auth(), PaymentController.getPaymentStatus);
+router.post(
+  '/checkout/essential-will',
+  auth(),
+  validateRequest(paymentValidation.checkoutSchema),
+  PaymentController.checkoutEssentialWill,
+);
 
-/**
- * GET /api/v1/payments/session?sessionId=cs_xxx
- * Used on the success page to confirm what was purchased.
+/** POST /api/v1/payments/checkout/unlimited-legacy
+ * Body: { successUrl: string, cancelUrl: string }
+ * Returns: { checkoutUrl: string, sessionId: string }
  */
-router.get('/session', auth(), PaymentController.getSessionDetails);
+router.post(
+  '/checkout/unlimited-legacy',
+  auth(),
+  validateRequest(paymentValidation.checkoutSchema),
+  PaymentController.checkoutUnlimitedLegacy,
+);
 
-/**
- * POST /api/v1/payments/portal
- * Opens a Stripe Billing Portal session so users can manage their subscription.
+// ─── Subscription Management ──────────────────────────────────────────────────
+
+/** GET /api/v1/payments/subscription
+ * Returns current tier, expiry, and payment history.
  */
-router.post('/portal', auth(), PaymentController.createCustomerPortalSession);
+router.get('/subscription', auth(), PaymentController.getSubscriptionStatus);
 
-/**
- * DELETE /api/v1/payments/subscription
- * Cancel active Unlimited Legacy subscription (cancels at period end).
+/** DELETE /api/v1/payments/subscription
+ * Schedules cancellation at period end.
  */
 router.delete('/subscription', auth(), PaymentController.cancelSubscription);
+
+/** POST /api/v1/payments/subscription/reactivate
+ * Undoes a scheduled cancellation.
+ */
+router.post('/subscription/reactivate', auth(), PaymentController.reactivateSubscription);
 
 export const PaymentRoutes = router;

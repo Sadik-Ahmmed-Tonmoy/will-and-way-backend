@@ -1,13 +1,12 @@
 import { z } from 'zod';
 
-const createCheckoutSessionSchema = z.object({
+const checkoutSchema = z.object({
   body: z.object({
-    productType: z.enum(['essential_will', 'unlimited_legacy'], {
-      errorMap: () => ({ message: "productType must be 'essential_will' or 'unlimited_legacy'" }),
-    }),
+    successUrl: z.string().url('successUrl must be a valid URL'),
+    cancelUrl: z.string().url('cancelUrl must be a valid URL'),
   }),
 });
 
 export const paymentValidation = {
-  createCheckoutSessionSchema,
+  checkoutSchema,
 };

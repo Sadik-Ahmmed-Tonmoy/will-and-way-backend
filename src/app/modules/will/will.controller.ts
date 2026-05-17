@@ -77,7 +77,7 @@ const addBackupExecutor = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateExecutor = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.updateExecutor(req.user.id, req.params.id, req.body);
+  const result = await WillServices.updateExecutor(req.user.id, req.params.id as string, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -87,7 +87,7 @@ const updateExecutor = catchAsync(async (req: Request, res: Response) => {
 });
 
 const deleteExecutor = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.deleteExecutor(req.user.id, req.params.id);
+  const result = await WillServices.deleteExecutor(req.user.id, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -97,7 +97,7 @@ const deleteExecutor = catchAsync(async (req: Request, res: Response) => {
 });
 
 const removePersonFromExecutor = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.removePersonFromExecutor(req.user.id, req.params.peopleId);
+  const result = await WillServices.removePersonFromExecutor(req.user.id, req.params.peopleId as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -108,7 +108,7 @@ const removePersonFromExecutor = catchAsync(async (req: Request, res: Response) 
 );
 
 const removeBackupPersonFromExecutor = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.removeBackupPersonFromExecutor(req.user.id, req.params.peopleId);
+  const result = await WillServices.removeBackupPersonFromExecutor(req.user.id, req.params.peopleId as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -155,7 +155,7 @@ const getAllDistributions = catchAsync(async (req: Request, res: Response) => {
 // Add backup distributor to a distribution
 const addBackupDistributor = catchAsync(async (req: Request, res: Response) => {
   const { distributionId } = req.params;
-  const result = await WillServices.addBackupDistributor(req.user.id, distributionId, req.body);
+  const result = await WillServices.addBackupDistributor(req.user.id, distributionId as string, req.body);
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
@@ -167,7 +167,7 @@ const addBackupDistributor = catchAsync(async (req: Request, res: Response) => {
 // Update backup distributor
 const updateBackupDistributor = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await WillServices.updateBackupDistributor(req.user.id, id, req.body);
+  const result = await WillServices.updateBackupDistributor(req.user.id, id as string, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -179,7 +179,7 @@ const updateBackupDistributor = catchAsync(async (req: Request, res: Response) =
 // Delete backup distributor
 const deleteBackupDistributor = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await WillServices.deleteBackupDistributor(req.user.id, id);
+  const result = await WillServices.deleteBackupDistributor(req.user.id, id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -189,7 +189,7 @@ const deleteBackupDistributor = catchAsync(async (req: Request, res: Response) =
 });
 
 const deleteEstateDistribution = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.deleteEstateDistribution(req.user.id, req.params.id);
+  const result = await WillServices.deleteEstateDistribution(req.user.id, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -213,7 +213,7 @@ const addWillGift = catchAsync(async (req: Request, res: Response) => {
 });
 
 const deleteWillGift = catchAsync(async (req: Request, res: Response) => {
-  const result = await WillServices.deleteWillGift(req.user.id, req.params.id);
+  const result = await WillServices.deleteWillGift(req.user.id, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
